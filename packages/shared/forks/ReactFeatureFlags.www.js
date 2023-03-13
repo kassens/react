@@ -19,7 +19,6 @@ export const {
   enableTrustedTypesIntegration,
   disableSchedulerTimeoutBasedOnReactExpirationTime,
   replayFailedUnitOfWorkWithInvokeGuardedCallback,
-  enableFilterEmptyStringAttributesDOM,
   enableLegacyFBSupport,
   deferRenderPhaseUpdateToNextBatch,
   enableDebugTracing,
@@ -91,6 +90,8 @@ export const enableLegacyHidden = true;
 export const enableComponentStackLocations = true;
 
 export const disableTextareaChildren = __EXPERIMENTAL__;
+
+export const enableFilterEmptyStringAttributesDOM = true;
 
 export const allowConcurrentByDefault = true;
 
