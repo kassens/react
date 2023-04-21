@@ -42,22 +42,10 @@ commands:
   setup_node_modules:
     description: "Restore node_modules"
     steps:
-      - restore_cache:
-          name: Restore yarn cache
-          keys:
-            - v2-yarn_cache-{{ arch }}-{{ checksum "yarn.lock" }}
       - run:
           name: Install dependencies
           command: |
-            yarn install --frozen-lockfile --cache-folder ~/.cache/yarn
-            if [ $? -ne 0 ]; then
-              yarn install --frozen-lockfile --cache-folder ~/.cache/yarn
-            fi
-      - save_cache:
-          name: Save yarn cache
-          key: v2-yarn_cache-{{ arch }}-{{ checksum "yarn.lock" }}
-          paths:
-            - ~/.cache/yarn
+            yarn install --frozen-lockfile --offline
 
 # The CircleCI API doesn't yet support triggering a specific workflow, but it
 # does support triggering a pipeline. So as a workaround you can triggger the
