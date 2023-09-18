@@ -117,7 +117,7 @@ import {
   HostEffectMask,
   ForceClientRender,
   BeforeMutationMask,
-  MutationMask,
+  MutationMaskOld,
   LayoutMask,
   PassiveMask,
   PlacementDEV,
@@ -2731,11 +2731,11 @@ function commitRootImpl(
   // Reconsider whether this is necessary.
   const subtreeHasEffects =
     (finishedWork.subtreeFlags &
-      (BeforeMutationMask | MutationMask | LayoutMask | PassiveMask)) !==
+      (BeforeMutationMask | MutationMaskOld | LayoutMask | PassiveMask)) !==
     NoFlags;
   const rootHasEffect =
     (finishedWork.flags &
-      (BeforeMutationMask | MutationMask | LayoutMask | PassiveMask)) !==
+      (BeforeMutationMask | MutationMaskOld | LayoutMask | PassiveMask)) !==
     NoFlags;
 
   if (subtreeHasEffects || rootHasEffect) {

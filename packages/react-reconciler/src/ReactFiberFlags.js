@@ -20,6 +20,7 @@ export const Hydrating = /*                    */ 0b0000000000000001000000000000
 
 // You can change the rest (and add more).
 export const Update = /*                       */ 0b0000000000000000000000000100;
+export const PersistentUpdate = /*            */ 0b10000000000000000000000000000;
 /* Skipped value:                                 0b0000000000000000000000001000; */
 
 export const ChildDeletion = /*                */ 0b0000000000000000000000010000;
@@ -87,7 +88,7 @@ export const BeforeMutationMask: number =
       ChildDeletion | Visibility
     : 0);
 
-export const MutationMask =
+export const MutationMaskOld =
   Placement |
   Update |
   ChildDeletion |

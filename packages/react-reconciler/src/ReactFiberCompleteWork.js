@@ -82,7 +82,7 @@ import {
   Snapshot,
   ChildDeletion,
   StaticMask,
-  MutationMask,
+  MutationMaskOld,
   Passive,
   ForceClientRender,
   MaySuspendCommit,
@@ -200,8 +200,8 @@ function hadNoMutationsEffects(current: null | Fiber, completedWork: Fiber) {
   let child = completedWork.child;
   while (child !== null) {
     if (
-      (child.flags & MutationMask) !== NoFlags ||
-      (child.subtreeFlags & MutationMask) !== NoFlags
+      (child.flags & MutationMaskOld) !== NoFlags ||
+      (child.subtreeFlags & MutationMaskOld) !== NoFlags
     ) {
       return false;
     }

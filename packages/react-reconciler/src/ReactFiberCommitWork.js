@@ -91,7 +91,7 @@ import {
   Hydrating,
   Passive,
   BeforeMutationMask,
-  MutationMask,
+  MutationMaskOld,
   LayoutMask,
   PassiveMask,
   Visibility,
@@ -2525,7 +2525,7 @@ function recursivelyTraverseMutationEffects(
   }
 
   const prevDebugFiber = getCurrentDebugFiberInDEV();
-  if (parentFiber.subtreeFlags & MutationMask) {
+  if (parentFiber.subtreeFlags & MutationMaskOld) {
     let child = parentFiber.child;
     while (child !== null) {
       setCurrentDebugFiberInDEV(child);
