@@ -81,7 +81,7 @@ import {
   Hydrating,
   ContentReset,
   DidCapture,
-  Update,
+  NonPersistUpdate,
   Ref,
   RefStatic,
   ChildDeletion,
@@ -1061,7 +1061,7 @@ function updateProfiler(
   renderLanes: Lanes,
 ) {
   if (enableProfilerTimer) {
-    workInProgress.flags |= Update;
+    workInProgress.flags |= NonPersistUpdate;
 
     if (enableProfilerCommitHooks) {
       // Reset effect durations for the next eventual effect phase.
@@ -3837,7 +3837,7 @@ function attemptEarlyBailoutIfNoScheduledUpdate(
           workInProgress.childLanes,
         );
         if (hasChildWork) {
-          workInProgress.flags |= Update;
+          workInProgress.flags |= NonPersistUpdate;
         }
 
         if (enableProfilerCommitHooks) {

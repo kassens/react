@@ -75,7 +75,7 @@ import {
   Ref,
   RefStatic,
   Placement,
-  Update,
+  NonPersistUpdate,
   Visibility,
   NoFlags,
   DidCapture,
@@ -178,7 +178,7 @@ import {suspendCommit} from './ReactFiberThenable';
 function markUpdate(workInProgress: Fiber) {
   // Tag the fiber with an update effect. This turns a Placement into
   // a PlacementAndUpdate.
-  workInProgress.flags |= Update;
+  workInProgress.flags |= NonPersistUpdate;
 }
 
 function markRef(workInProgress: Fiber) {
@@ -587,7 +587,7 @@ function scheduleRetryEffect(
   if (wakeables !== null) {
     // Schedule an effect to attach a retry listener to the promise.
     // TODO: Move to passive phase
-    workInProgress.flags |= Update;
+    workInProgress.flags |= NonPersistUpdate;
   } else {
     // This boundary suspended, but no wakeables were added to the retry
     // queue. Check if the renderer suspended commit. If so, this means
@@ -894,7 +894,7 @@ function completeDehydratedSuspenseBoundary(
       // It's also a signal to replay events and the suspense callback.
       // If something suspended, schedule an effect to attach retry listeners.
       // So we might as well always mark this.
-      workInProgress.flags |= Update;
+      workInProgress.flags |= NonPersistUpdate;
       bubbleProperties(workInProgress);
       if (enableProfilerTimer) {
         if ((workInProgress.mode & ProfileMode) !== NoMode) {
@@ -1444,7 +1444,7 @@ function completeWork(
       ) {
         // Always notify the callback
         // TODO: Move to passive phase
-        workInProgress.flags |= Update;
+        workInProgress.flags |= NonPersistUpdate;
       }
       bubbleProperties(workInProgress);
       if (enableProfilerTimer) {
@@ -1759,7 +1759,7 @@ function completeWork(
           if (
             (!enableLegacyHidden ||
               workInProgress.tag !== LegacyHiddenComponent) &&
-            workInProgress.subtreeFlags & (Placement | Update)
+            workInProgress.subtreeFlags & (Placement | NonPersistUpdate)
           ) {
             workInProgress.flags |= Visibility;
           }

@@ -85,7 +85,7 @@ import {
   Placement,
   ChildDeletion,
   Snapshot,
-  Update,
+  NonPersistUpdate,
   Callback,
   Ref,
   Hydrating,
@@ -465,7 +465,7 @@ function commitBeforeMutationEffectsOnFiber(finishedWork: Fiber) {
   switch (finishedWork.tag) {
     case FunctionComponent: {
       if (enableUseEffectEventHook) {
-        if ((flags & Update) !== NoFlags) {
+        if ((flags & NonPersistUpdate) !== NoFlags) {
           commitUseEffectEventMount(finishedWork);
         }
       }
@@ -743,7 +743,7 @@ export function commitPassiveEffectDurations(
     getExecutionContext() & CommitContext
   ) {
     // Only Profilers with work in their subtree will have an Update effect scheduled.
-    if ((finishedWork.flags & Update) !== NoFlags) {
+    if ((finishedWork.flags & NonPersistUpdate) !== NoFlags) {
       switch (finishedWork.tag) {
         case Profiler: {
           const {passiveEffectDuration} = finishedWork.stateNode;
@@ -1062,7 +1062,7 @@ function commitLayoutEffectOnFiber(
         finishedWork,
         committedLanes,
       );
-      if (flags & Update) {
+      if (flags & NonPersistUpdate) {
         commitHookLayoutEffects(finishedWork, HookLayout | HookHasEffect);
       }
       break;
@@ -1073,7 +1073,7 @@ function commitLayoutEffectOnFiber(
         finishedWork,
         committedLanes,
       );
-      if (flags & Update) {
+      if (flags & NonPersistUpdate) {
         commitClassLayoutLifecycles(finishedWork, current);
       }
 
@@ -1146,7 +1146,7 @@ function commitLayoutEffectOnFiber(
       // (eg DOM renderer may schedule auto-focus for inputs and form controls).
       // These effects should only be committed when components are first mounted,
       // aka when there is no current/alternate.
-      if (current === null && flags & Update) {
+      if (current === null && flags & NonPersistUpdate) {
         commitHostComponentMount(finishedWork);
       }
 
@@ -1163,7 +1163,7 @@ function commitLayoutEffectOnFiber(
       );
       // TODO: Should this fire inside an offscreen tree? Or should it wait to
       // fire when the tree becomes visible again.
-      if (flags & Update) {
+      if (flags & NonPersistUpdate) {
         commitProfilerUpdate(finishedWork, current);
       }
       break;
@@ -1174,7 +1174,7 @@ function commitLayoutEffectOnFiber(
         finishedWork,
         committedLanes,
       );
-      if (flags & Update) {
+      if (flags & NonPersistUpdate) {
         commitSuspenseHydrationCallbacks(finishedRoot, finishedWork);
       }
       break;
@@ -2557,7 +2557,7 @@ function commitMutationEffectsOnFiber(
       recursivelyTraverseMutationEffects(root, finishedWork, lanes);
       commitReconciliationEffects(finishedWork);
 
-      if (flags & Update) {
+      if (flags & NonPersistUpdate) {
         try {
           commitHookEffectListUnmount(
             HookInsertion | HookHasEffect,
@@ -2635,7 +2635,7 @@ function commitMutationEffectsOnFiber(
           }
         }
 
-        if (flags & Update) {
+        if (flags & NonPersistUpdate) {
           const currentResource =
             current !== null ? current.memoizedState : null;
           const newResource = finishedWork.memoizedState;
@@ -2712,7 +2712,7 @@ function commitMutationEffectsOnFiber(
     }
     case HostSingleton: {
       if (enableHostSingletons && supportsSingletons) {
-        if (flags & Update) {
+        if (flags & NonPersistUpdate) {
           const previousWork = finishedWork.alternate;
           if (previousWork === null) {
             const singleton = finishedWork.stateNode;
@@ -2755,7 +2755,7 @@ function commitMutationEffectsOnFiber(
           }
         }
 
-        if (flags & Update) {
+        if (flags & NonPersistUpdate) {
           const instance: Instance = finishedWork.stateNode;
           if (instance != null) {
             // Commit the work prepared earlier.
@@ -2791,7 +2791,7 @@ function commitMutationEffectsOnFiber(
       recursivelyTraverseMutationEffects(root, finishedWork, lanes);
       commitReconciliationEffects(finishedWork);
 
-      if (flags & Update) {
+      if (flags & NonPersistUpdate) {
         if (supportsMutation) {
           if (finishedWork.stateNode === null) {
             throw new Error(
@@ -2833,7 +2833,7 @@ function commitMutationEffectsOnFiber(
         commitReconciliationEffects(finishedWork);
       }
 
-      if (flags & Update) {
+      if (flags & NonPersistUpdate) {
         if (supportsMutation && supportsHydration) {
           if (current !== null) {
             const prevRootState: RootState = current.memoizedState;
@@ -2876,7 +2876,7 @@ function commitMutationEffectsOnFiber(
         commitReconciliationEffects(finishedWork);
       }
 
-      if (flags & Update) {
+      if (flags & NonPersistUpdate) {
         if (supportsPersistence) {
           const portal = finishedWork.stateNode;
           const containerInfo = portal.containerInfo;
@@ -2928,7 +2928,7 @@ function commitMutationEffectsOnFiber(
         }
       }
 
-      if (flags & Update) {
+      if (flags & NonPersistUpdate) {
         try {
           commitSuspenseCallback(finishedWork);
         } catch (error) {
@@ -3019,7 +3019,7 @@ function commitMutationEffectsOnFiber(
       }
 
       // TODO: Move to passive phase
-      if (flags & Update) {
+      if (flags & NonPersistUpdate) {
         const offscreenQueue: OffscreenQueue | null =
           (finishedWork.updateQueue: any);
         if (offscreenQueue !== null) {
@@ -3036,7 +3036,7 @@ function commitMutationEffectsOnFiber(
       recursivelyTraverseMutationEffects(root, finishedWork, lanes);
       commitReconciliationEffects(finishedWork);
 
-      if (flags & Update) {
+      if (flags & NonPersistUpdate) {
         const retryQueue: Set<Wakeable> | null =
           (finishedWork.updateQueue: any);
         if (retryQueue !== null) {
@@ -3059,7 +3059,7 @@ function commitMutationEffectsOnFiber(
           }
           safelyAttachRef(finishedWork, finishedWork.return);
         }
-        if (flags & Update) {
+        if (flags & NonPersistUpdate) {
           const scopeInstance = finishedWork.stateNode;
           prepareScopeUpdate(scopeInstance, finishedWork);
         }
@@ -3289,7 +3289,11 @@ export function reappearLayoutEffects(
       // (eg DOM renderer may schedule auto-focus for inputs and form controls).
       // These effects should only be committed when components are first mounted,
       // aka when there is no current/alternate.
-      if (includeWorkInProgressEffects && current === null && flags & Update) {
+      if (
+        includeWorkInProgressEffects &&
+        current === null &&
+        flags & NonPersistUpdate
+      ) {
         commitHostComponentMount(finishedWork);
       }
 
@@ -3304,7 +3308,7 @@ export function reappearLayoutEffects(
         includeWorkInProgressEffects,
       );
       // TODO: Figure out how Profiler updates should work with Offscreen
-      if (includeWorkInProgressEffects && flags & Update) {
+      if (includeWorkInProgressEffects && flags & NonPersistUpdate) {
         commitProfilerUpdate(finishedWork, current);
       }
       break;
@@ -3318,7 +3322,7 @@ export function reappearLayoutEffects(
 
       // TODO: Figure out how Suspense hydration callbacks should work
       // with Offscreen.
-      if (includeWorkInProgressEffects && flags & Update) {
+      if (includeWorkInProgressEffects && flags & NonPersistUpdate) {
         commitSuspenseHydrationCallbacks(finishedRoot, finishedWork);
       }
       break;

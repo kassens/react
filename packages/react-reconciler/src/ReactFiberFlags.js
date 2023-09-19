@@ -19,7 +19,7 @@ export const DidCapture = /*                   */ 0b0000000000000000000010000000
 export const Hydrating = /*                    */ 0b0000000000000001000000000000;
 
 // You can change the rest (and add more).
-export const Update = /*                       */ 0b0000000000000000000000000100;
+export const NonPersistUpdate = /*                       */ 0b0000000000000000000000000100;
 export const PersistentUpdate = /*            */ 0b10000000000000000000000000000;
 /* Skipped value:                                 0b0000000000000000000000001000; */
 
@@ -44,7 +44,7 @@ export const ScheduleRetry = StoreConsistency;
 export const ShouldSuspendCommit = Visibility;
 
 export const LifecycleEffectMask =
-  Passive | Update | Callback | Ref | Snapshot | StoreConsistency;
+  Passive | NonPersistUpdate | Callback | Ref | Snapshot | StoreConsistency;
 
 // Union of all commit flags (flags with the lifetime of a particular commit)
 export const HostEffectMask = /*               */ 0b0000000000000111111111111111;
@@ -78,7 +78,7 @@ export const MountPassiveDev = /*              */ 0b1000000000000000000000000000
 export const BeforeMutationMask: number =
   // TODO: Remove Update flag from before mutation phase by re-landing Visibility
   // flag logic (see #20043)
-  Update |
+  NonPersistUpdate |
   Snapshot |
   (enableCreateEventHandleAPI
     ? // createEventHandle needs to visit deleted and hidden trees to
@@ -90,13 +90,13 @@ export const BeforeMutationMask: number =
 
 export const MutationMaskOld =
   Placement |
-  Update |
+  NonPersistUpdate |
   ChildDeletion |
   ContentReset |
   Ref |
   Hydrating |
   Visibility;
-export const LayoutMask = Update | Callback | Ref | Visibility;
+export const LayoutMask = NonPersistUpdate | Callback | Ref | Visibility;
 
 // TODO: Split into PassiveMountMask and PassiveUnmountMask
 export const PassiveMask = Passive | Visibility | ChildDeletion;

@@ -84,7 +84,7 @@ import {
   Passive as PassiveEffect,
   PassiveStatic as PassiveStaticEffect,
   StaticMask as StaticMaskEffect,
-  Update as UpdateEffect,
+  NonPersistUpdate,
   StoreConsistency,
   MountLayoutDev as MountLayoutDevEffect,
   MountPassiveDev as MountPassiveDevEffect,
@@ -881,10 +881,10 @@ export function bailoutHooks(
       MountPassiveDevEffect |
       MountLayoutDevEffect |
       PassiveEffect |
-      UpdateEffect
+      NonPersistUpdate
     );
   } else {
-    workInProgress.flags &= ~(PassiveEffect | UpdateEffect);
+    workInProgress.flags &= ~(PassiveEffect | NonPersistUpdate);
   }
   current.lanes = removeLanes(current.lanes, lanes);
 }
@@ -2395,7 +2395,7 @@ function updateEffect(
 function useEffectEventImpl<Args, Return, F: (...Array<Args>) => Return>(
   payload: EventFunctionPayload<Args, Return, F>,
 ) {
-  currentlyRenderingFiber.flags |= UpdateEffect;
+  currentlyRenderingFiber.flags |= NonPersistUpdate;
   let componentUpdateQueue: null | FunctionComponentUpdateQueue =
     (currentlyRenderingFiber.updateQueue: any);
   if (componentUpdateQueue === null) {
@@ -2450,21 +2450,21 @@ function mountInsertionEffect(
   create: () => (() => void) | void,
   deps: Array<mixed> | void | null,
 ): void {
-  mountEffectImpl(UpdateEffect, HookInsertion, create, deps);
+  mountEffectImpl(NonPersistUpdate, HookInsertion, create, deps);
 }
 
 function updateInsertionEffect(
   create: () => (() => void) | void,
   deps: Array<mixed> | void | null,
 ): void {
-  return updateEffectImpl(UpdateEffect, HookInsertion, create, deps);
+  return updateEffectImpl(NonPersistUpdate, HookInsertion, create, deps);
 }
 
 function mountLayoutEffect(
   create: () => (() => void) | void,
   deps: Array<mixed> | void | null,
 ): void {
-  let fiberFlags: Flags = UpdateEffect | LayoutStaticEffect;
+  let fiberFlags: Flags = NonPersistUpdate | LayoutStaticEffect;
   if (
     __DEV__ &&
     (currentlyRenderingFiber.mode & StrictEffectsMode) !== NoMode
@@ -2478,7 +2478,7 @@ function updateLayoutEffect(
   create: () => (() => void) | void,
   deps: Array<mixed> | void | null,
 ): void {
-  return updateEffectImpl(UpdateEffect, HookLayout, create, deps);
+  return updateEffectImpl(NonPersistUpdate, HookLayout, create, deps);
 }
 
 function imperativeHandleEffect<T>(
@@ -2530,7 +2530,7 @@ function mountImperativeHandle<T>(
   const effectDeps =
     deps !== null && deps !== undefined ? deps.concat([ref]) : null;
 
-  let fiberFlags: Flags = UpdateEffect | LayoutStaticEffect;
+  let fiberFlags: Flags = NonPersistUpdate | LayoutStaticEffect;
   if (
     __DEV__ &&
     (currentlyRenderingFiber.mode & StrictEffectsMode) !== NoMode
@@ -2565,7 +2565,7 @@ function updateImperativeHandle<T>(
     deps !== null && deps !== undefined ? deps.concat([ref]) : null;
 
   updateEffectImpl(
-    UpdateEffect,
+    NonPersistUpdate,
     HookLayout,
     imperativeHandleEffect.bind(null, create, ref),
     effectDeps,

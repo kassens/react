@@ -13,7 +13,7 @@ import type {UpdateQueue} from './ReactFiberClassUpdateQueue';
 
 import {
   LayoutStatic,
-  Update,
+  NonPersistUpdate,
   Snapshot,
   MountLayoutDev,
 } from './ReactFiberFlags';
@@ -896,7 +896,7 @@ function mountClassInstance(
   }
 
   if (typeof instance.componentDidMount === 'function') {
-    workInProgress.flags |= Update | LayoutStatic;
+    workInProgress.flags |= NonPersistUpdate | LayoutStatic;
   }
   if (__DEV__ && (workInProgress.mode & StrictEffectsMode) !== NoMode) {
     workInProgress.flags |= MountLayoutDev;
@@ -969,7 +969,7 @@ function resumeMountClassInstance(
     // If an update was already in progress, we should schedule an Update
     // effect even though we're bailing out, so that cWU/cDU are called.
     if (typeof instance.componentDidMount === 'function') {
-      workInProgress.flags |= Update | LayoutStatic;
+      workInProgress.flags |= NonPersistUpdate | LayoutStatic;
     }
     if (__DEV__ && (workInProgress.mode & StrictEffectsMode) !== NoMode) {
       workInProgress.flags |= MountLayoutDev;
@@ -1015,7 +1015,7 @@ function resumeMountClassInstance(
       }
     }
     if (typeof instance.componentDidMount === 'function') {
-      workInProgress.flags |= Update | LayoutStatic;
+      workInProgress.flags |= NonPersistUpdate | LayoutStatic;
     }
     if (__DEV__ && (workInProgress.mode & StrictEffectsMode) !== NoMode) {
       workInProgress.flags |= MountLayoutDev;
@@ -1024,7 +1024,7 @@ function resumeMountClassInstance(
     // If an update was already in progress, we should schedule an Update
     // effect even though we're bailing out, so that cWU/cDU are called.
     if (typeof instance.componentDidMount === 'function') {
-      workInProgress.flags |= Update | LayoutStatic;
+      workInProgress.flags |= NonPersistUpdate | LayoutStatic;
     }
     if (__DEV__ && (workInProgress.mode & StrictEffectsMode) !== NoMode) {
       workInProgress.flags |= MountLayoutDev;
@@ -1130,7 +1130,7 @@ function updateClassInstance(
         unresolvedOldProps !== current.memoizedProps ||
         oldState !== current.memoizedState
       ) {
-        workInProgress.flags |= Update;
+        workInProgress.flags |= NonPersistUpdate;
       }
     }
     if (typeof instance.getSnapshotBeforeUpdate === 'function') {
@@ -1190,7 +1190,7 @@ function updateClassInstance(
       }
     }
     if (typeof instance.componentDidUpdate === 'function') {
-      workInProgress.flags |= Update;
+      workInProgress.flags |= NonPersistUpdate;
     }
     if (typeof instance.getSnapshotBeforeUpdate === 'function') {
       workInProgress.flags |= Snapshot;
@@ -1203,7 +1203,7 @@ function updateClassInstance(
         unresolvedOldProps !== current.memoizedProps ||
         oldState !== current.memoizedState
       ) {
-        workInProgress.flags |= Update;
+        workInProgress.flags |= NonPersistUpdate;
       }
     }
     if (typeof instance.getSnapshotBeforeUpdate === 'function') {
