@@ -70,6 +70,7 @@
     "gzip-size": "^5.1.1",
     "hermes-eslint": "^0.18.2",
     "hermes-parser": "^0.18.2",
+    "hermes-transform": "^0.18.2",
     "jest": "^29.4.2",
     "jest-cli": "^29.4.2",
     "jest-diff": "^29.4.2",
