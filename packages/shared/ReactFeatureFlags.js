@@ -150,7 +150,7 @@ export const createRootStrictEffectsByDefault = false;
 
 export const disableModulePatternComponents = false;
 
-export const disableLegacyContext = false;
+export const disableLegacyContext = true;
 
 export const enableUseRefAccessWarning = false;
 
