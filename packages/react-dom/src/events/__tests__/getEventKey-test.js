@@ -10,23 +10,33 @@
 'use strict';
 
 let React;
-let ReactDOM;
+let ReactDOMClient;
+
+let act;
 
 describe('getEventKey', () => {
   let container;
+  let root;
 
   beforeEach(() => {
     React = require('react');
-    ReactDOM = require('react-dom');
+    ReactDOMClient = require('react-dom/client');
+
+    act = require('internal-test-utils').act;
 
     // The container has to be attached for events to fire.
     container = document.createElement('div');
+    root = ReactDOMClient.createRoot(container);
     document.body.appendChild(container);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await act(() => {
+      root.unmount();
+    });
     document.body.removeChild(container);
     container = null;
+    root = null;
   });
 
   describe('when key is implemented in a browser', () => {
@@ -39,7 +49,9 @@ describe('getEventKey', () => {
           }
         }
 
-        ReactDOM.render(<Comp />, container);
+        await act(() => {
+          root.render(<Comp />);
+        });
 
         const nativeEvent = new KeyboardEvent('keydown', {
           key: 'Del',
@@ -60,7 +72,9 @@ describe('getEventKey', () => {
           }
         }
 
-        ReactDOM.render(<Comp />, container);
+        await act(() => {
+          root.render(<Comp />);
+        });
 
         const nativeEvent = new KeyboardEvent('keydown', {
           key: 'f',
@@ -84,7 +98,9 @@ describe('getEventKey', () => {
             }
           }
 
-          ReactDOM.render(<Comp />, container);
+          await act(() => {
+            root.render(<Comp />);
+          });
 
           const nativeEvent = new KeyboardEvent('keypress', {
             charCode: 13,
@@ -105,7 +121,9 @@ describe('getEventKey', () => {
             }
           }
 
-          ReactDOM.render(<Comp />, container);
+          await act(() => {
+            root.render(<Comp />);
+          });
 
           const nativeEvent = new KeyboardEvent('keypress', {
             charCode: 65,
@@ -128,7 +146,9 @@ describe('getEventKey', () => {
             }
           }
 
-          ReactDOM.render(<Comp />, container);
+          await act(() => {
+            root.render(<Comp />);
+          });
 
           const nativeEvent = new KeyboardEvent('keydown', {
             keyCode: 45,
@@ -149,7 +169,9 @@ describe('getEventKey', () => {
             }
           }
 
-          ReactDOM.render(<Comp />, container);
+          await act(() => {
+            root.render(<Comp />);
+          });
 
           const nativeEvent = new KeyboardEvent('keydown', {
             keyCode: 1337,
