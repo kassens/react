@@ -1058,6 +1058,7 @@ describe('ReactComponentLifeCycle', () => {
   });
 
   if (!require('shared/ReactFeatureFlags').disableModulePatternComponents) {
+    // @gate !disableLegacyContext
     it('calls effects on module-pattern component', async () => {
       const log = [];
 
