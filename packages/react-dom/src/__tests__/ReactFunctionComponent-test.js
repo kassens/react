@@ -11,8 +11,9 @@
 
 let PropTypes;
 let React;
-let ReactDOM;
+let ReactDOMClient;
 let ReactTestUtils;
+let act;
 
 function FunctionComponent(props) {
   return <div>{props.name}</div>;
@@ -23,13 +24,18 @@ describe('ReactFunctionComponent', () => {
     jest.resetModules();
     PropTypes = require('prop-types');
     React = require('react');
-    ReactDOM = require('react-dom');
+    ReactDOMClient = require('react-dom/client');
+    act = require('internal-test-utils').act;
     ReactTestUtils = require('react-dom/test-utils');
   });
 
   it('should render stateless component', async () => {
     const el = document.createElement('div');
-    ReactDOM.render(<FunctionComponent name="A" />, el);
+
+    const root = ReactDOMClient.createRoot(el);
+    await act(() => {
+      root.render(<FunctionComponent name="A" />);
+    });
 
     expect(el.textContent).toBe('A');
   });
@@ -42,20 +48,29 @@ describe('ReactFunctionComponent', () => {
     }
 
     const el = document.createElement('div');
-    ReactDOM.render(<Parent name="A" />, el);
+
+    const root = ReactDOMClient.createRoot(el);
+    await act(() => {
+      root.render(<Parent name="A" />);
+    });
     expect(el.textContent).toBe('A');
 
-    ReactDOM.render(<Parent name="B" />, el);
+    await act(() => {
+      root.render(<Parent name="B" />);
+    });
     expect(el.textContent).toBe('B');
   });
 
   it('should unmount stateless component', async () => {
     const container = document.createElement('div');
 
-    ReactDOM.render(<FunctionComponent name="A" />, container);
+    const root = ReactDOMClient.createRoot(container);
+    await act(() => {
+      root.render(<FunctionComponent name="A" />);
+    });
     expect(container.textContent).toBe('A');
 
-    ReactDOM.unmountComponentAtNode(container);
+    root.unmount();
     expect(container.textContent).toBe('');
   });
 
@@ -90,11 +105,17 @@ describe('ReactFunctionComponent', () => {
     }
 
     const el = document.createElement('div');
-    ReactDOM.render(<GrandParent test="test" />, el);
+
+    const root = ReactDOMClient.createRoot(el);
+    await act(() => {
+      root.render(<GrandParent test="test" />);
+    });
 
     expect(el.textContent).toBe('test');
 
-    ReactDOM.render(<GrandParent test="mest" />, el);
+    await act(() => {
+      root.render(<GrandParent test="mest" />);
+    });
 
     expect(el.textContent).toBe('mest');
   });
@@ -107,9 +128,12 @@ describe('ReactFunctionComponent', () => {
 
     const container = document.createElement('div');
 
-    expect(() =>
-      ReactDOM.render(<FunctionComponentWithChildContext />, container),
-    ).toErrorDev(
+    await expect(async () => {
+      const root = ReactDOMClient.createRoot(container);
+      await act(() => {
+        root.render(<FunctionComponentWithChildContext />);
+      });
+    }).toErrorDev(
       'FunctionComponentWithChildContext: Function ' +
         'components do not support getDerivedStateFromProps.',
     );
@@ -126,12 +150,12 @@ describe('ReactFunctionComponent', () => {
 
     const container = document.createElement('div');
 
-    expect(() =>
-      ReactDOM.render(
-        <FunctionComponentWithChildContext name="A" />,
-        container,
-      ),
-    ).toErrorDev(
+    await expect(async () => {
+      const root = ReactDOMClient.createRoot(container);
+      await act(() => {
+        root.render(<FunctionComponentWithChildContext name="A" />);
+      });
+    }).toErrorDev(
       'FunctionComponentWithChildContext(...): childContextTypes cannot ' +
         'be defined on a function component.',
     );
@@ -399,7 +423,11 @@ describe('ReactFunctionComponent', () => {
     Child.contextTypes = {lang: PropTypes.string};
 
     const el = document.createElement('div');
-    ReactDOM.render(<Parent />, el);
+
+    const root = ReactDOMClient.createRoot(el);
+    await act(() => {
+      root.render(<Parent />);
+    });
     expect(el.textContent).toBe('en');
   });
 
