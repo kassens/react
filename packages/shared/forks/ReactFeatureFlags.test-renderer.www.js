@@ -28,7 +28,6 @@ export const enableFormActions = true; // Doesn't affect Test Renderer
 export const enableBinaryFlight = true;
 export const enableTaint = true;
 export const enablePostpone = false;
-export const enableSchedulerDebugging = false;
 export const disableJavaScriptURLs = false;
 export const disableCommentsAsDOMContainers = true;
 export const disableInputAttributeSyncing = false;
@@ -56,7 +55,6 @@ export const retryLaneExpirationMs = 5000;
 export const syncLaneExpirationMs = 250;
 export const transitionLaneExpirationMs = 5000;
 
-export const createRootStrictEffectsByDefault = false;
 export const enableUseRefAccessWarning = false;
 
 export const disableSchedulerTimeoutInWorkLoop = false;
