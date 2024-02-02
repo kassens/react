@@ -12,7 +12,6 @@
 // NOTE: We're explicitly not using JSX in this file. This is intended to test
 // classic JS without JSX.
 
-let PropTypes;
 let React;
 let ReactDOM;
 let ReactTestUtils;
@@ -25,7 +24,6 @@ describe('ReactElementValidator', () => {
   beforeEach(() => {
     jest.resetModules();
 
-    PropTypes = require('prop-types');
     ReactFeatureFlags = require('shared/ReactFeatureFlags');
     ReactFeatureFlags.replayFailedUnitOfWorkWithInvokeGuardedCallback = false;
     React = require('react');
@@ -208,30 +206,6 @@ describe('ReactElementValidator', () => {
     React.createElement(ComponentClass, null, [{}, {}]);
   });
 
-  it('should give context for PropType errors in nested components.', () => {
-    // In this test, we're making sure that if a proptype error is found in a
-    // component, we give a small hint as to which parent instantiated that
-    // component as per warnings about key usage in ReactElementValidator.
-    function MyComp(props) {
-      return React.createElement('div', null, 'My color is ' + props.color);
-    }
-    MyComp.propTypes = {
-      color: PropTypes.string,
-    };
-    function ParentComp() {
-      return React.createElement(MyComp, {color: 123});
-    }
-    expect(() => {
-      ReactTestUtils.renderIntoDocument(React.createElement(ParentComp));
-    }).toErrorDev(
-      'Warning: Failed prop type: ' +
-        'Invalid prop `color` of type `number` supplied to `MyComp`, ' +
-        'expected `string`.\n' +
-        '    in MyComp (at **)\n' +
-        '    in ParentComp (at **)',
-    );
-  });
-
   it('gives a helpful error when passing invalid types', () => {
     function Foo() {}
     expect(() => {
@@ -306,120 +280,6 @@ describe('ReactElementValidator', () => {
         '(for built-in components) or a class/function (for composite ' +
         'components) but got: null.' +
         '\n\nCheck the render method of `ParentComp`.\n    in ParentComp',
-    );
-  });
-
-  it('should check default prop values', () => {
-    class Component extends React.Component {
-      static propTypes = {prop: PropTypes.string.isRequired};
-      static defaultProps = {prop: null};
-      render() {
-        return React.createElement('span', null, this.props.prop);
-      }
-    }
-
-    expect(() =>
-      ReactTestUtils.renderIntoDocument(React.createElement(Component)),
-    ).toErrorDev(
-      'Warning: Failed prop type: The prop `prop` is marked as required in ' +
-        '`Component`, but its value is `null`.\n' +
-        '    in Component',
-    );
-  });
-
-  it('should not check the default for explicit null', () => {
-    class Component extends React.Component {
-      static propTypes = {prop: PropTypes.string.isRequired};
-      static defaultProps = {prop: 'text'};
-      render() {
-        return React.createElement('span', null, this.props.prop);
-      }
-    }
-
-    expect(() => {
-      ReactTestUtils.renderIntoDocument(
-        React.createElement(Component, {prop: null}),
-      );
-    }).toErrorDev(
-      'Warning: Failed prop type: The prop `prop` is marked as required in ' +
-        '`Component`, but its value is `null`.\n' +
-        '    in Component',
-    );
-  });
-
-  it('should check declared prop types', () => {
-    class Component extends React.Component {
-      static propTypes = {
-        prop: PropTypes.string.isRequired,
-      };
-      render() {
-        return React.createElement('span', null, this.props.prop);
-      }
-    }
-
-    expect(() => {
-      ReactTestUtils.renderIntoDocument(React.createElement(Component));
-      ReactTestUtils.renderIntoDocument(
-        React.createElement(Component, {prop: 42}),
-      );
-    }).toErrorDev([
-      'Warning: Failed prop type: ' +
-        'The prop `prop` is marked as required in `Component`, but its value ' +
-        'is `undefined`.\n' +
-        '    in Component',
-      'Warning: Failed prop type: ' +
-        'Invalid prop `prop` of type `number` supplied to ' +
-        '`Component`, expected `string`.\n' +
-        '    in Component',
-    ]);
-
-    // Should not error for strings
-    ReactTestUtils.renderIntoDocument(
-      React.createElement(Component, {prop: 'string'}),
-    );
-  });
-
-  it('should warn if a PropType creator is used as a PropType', () => {
-    class Component extends React.Component {
-      static propTypes = {
-        myProp: PropTypes.shape,
-      };
-      render() {
-        return React.createElement('span', null, this.props.myProp.value);
-      }
-    }
-
-    expect(() => {
-      ReactTestUtils.renderIntoDocument(
-        React.createElement(Component, {myProp: {value: 'hi'}}),
-      );
-    }).toErrorDev(
-      'Warning: Component: type specification of prop `myProp` is invalid; ' +
-        'the type checker function must return `null` or an `Error` but ' +
-        'returned a function. You may have forgotten to pass an argument to ' +
-        'the type checker creator (arrayOf, instanceOf, objectOf, oneOf, ' +
-        'oneOfType, and shape all require an argument).',
-    );
-  });
-
-  it('should warn if component declares PropTypes instead of propTypes', () => {
-    class MisspelledPropTypesComponent extends React.Component {
-      static PropTypes = {
-        prop: PropTypes.string,
-      };
-      render() {
-        return React.createElement('span', null, this.props.prop);
-      }
-    }
-
-    expect(() => {
-      ReactTestUtils.renderIntoDocument(
-        React.createElement(MisspelledPropTypesComponent, {prop: 'Hi'}),
-      );
-    }).toErrorDev(
-      'Warning: Component MisspelledPropTypesComponent declared `PropTypes` ' +
-        'instead of `propTypes`. Did you misspell the property assignment?',
-      {withoutStack: true},
     );
   });
 
