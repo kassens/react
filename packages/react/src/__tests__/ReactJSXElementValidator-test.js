@@ -14,6 +14,7 @@
 let React;
 let ReactTestUtils;
 let PropTypes;
+let act;
 
 describe('ReactJSXElementValidator', () => {
   let Component;
@@ -25,6 +26,7 @@ describe('ReactJSXElementValidator', () => {
     PropTypes = require('prop-types');
     React = require('react');
     ReactTestUtils = require('react-dom/test-utils');
+    act = require('internal-test-utils').act;
 
     Component = class extends React.Component {
       render() {
