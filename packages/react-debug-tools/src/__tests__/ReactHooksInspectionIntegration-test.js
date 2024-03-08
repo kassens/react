@@ -952,7 +952,7 @@ describe('ReactHooksInspectionIntegration', () => {
           "isStateEditable": false,
           "name": "Transition",
           "subHooks": [],
-          "value": undefined,
+          "value": false,
         },
         {
           "debugInfo": null,
@@ -977,6 +977,168 @@ describe('ReactHooksInspectionIntegration', () => {
             "lineNumber": 0,
           },
           "id": 2,
+          "isStateEditable": false,
+          "name": "Memo",
+          "subHooks": [],
+          "value": "not used",
+        },
+      ]
+    `);
+  });
+
+  it('should update isPending returned from useTransition', async () => {
+    const IndefiniteSuspender = React.lazy(() => new Promise(() => {}));
+    let startTransition;
+    function Foo(props) {
+      const [show, setShow] = React.useState(false);
+      const [isPending, _startTransition] = React.useTransition();
+      React.useMemo(() => 'hello', []);
+      React.useMemo(() => 'not used', []);
+
+      // Otherwise we capture the version from the react-debug-tools dispatcher.
+      if (startTransition === undefined) {
+        startTransition = () => {
+          _startTransition(() => {
+            setShow(true);
+          });
+        };
+      }
+
+      return (
+        <React.Suspense fallback="Loading">
+          {isPending ? 'Pending' : null}
+          {show ? <IndefiniteSuspender /> : null}
+        </React.Suspense>
+      );
+    }
+    const renderer = await act(() => {
+      return ReactTestRenderer.create(<Foo />, {isConcurrent: true});
+    });
+    expect(renderer).toMatchRenderedOutput(null);
+    let childFiber = renderer.root.findByType(Foo)._currentFiber();
+    let tree = ReactDebugTools.inspectHooksOfFiber(childFiber);
+    expect(normalizeSourceLoc(tree)).toMatchInlineSnapshot(`
+      [
+        {
+          "debugInfo": null,
+          "hookSource": {
+            "columnNumber": 0,
+            "fileName": "**",
+            "functionName": "Foo",
+            "lineNumber": 0,
+          },
+          "id": 0,
+          "isStateEditable": true,
+          "name": "State",
+          "subHooks": [],
+          "value": false,
+        },
+        {
+          "debugInfo": null,
+          "hookSource": {
+            "columnNumber": 0,
+            "fileName": "**",
+            "functionName": "Foo",
+            "lineNumber": 0,
+          },
+          "id": 1,
+          "isStateEditable": false,
+          "name": "Transition",
+          "subHooks": [],
+          "value": false,
+        },
+        {
+          "debugInfo": null,
+          "hookSource": {
+            "columnNumber": 0,
+            "fileName": "**",
+            "functionName": "Foo",
+            "lineNumber": 0,
+          },
+          "id": 2,
+          "isStateEditable": false,
+          "name": "Memo",
+          "subHooks": [],
+          "value": "hello",
+        },
+        {
+          "debugInfo": null,
+          "hookSource": {
+            "columnNumber": 0,
+            "fileName": "**",
+            "functionName": "Foo",
+            "lineNumber": 0,
+          },
+          "id": 3,
+          "isStateEditable": false,
+          "name": "Memo",
+          "subHooks": [],
+          "value": "not used",
+        },
+      ]
+    `);
+
+    await act(() => {
+      startTransition();
+    });
+
+    expect(renderer).toMatchRenderedOutput('Pending');
+
+    childFiber = renderer.root.findByType(Foo)._currentFiber();
+    tree = ReactDebugTools.inspectHooksOfFiber(childFiber);
+    expect(normalizeSourceLoc(tree)).toMatchInlineSnapshot(`
+      [
+        {
+          "debugInfo": null,
+          "hookSource": {
+            "columnNumber": 0,
+            "fileName": "**",
+            "functionName": "Foo",
+            "lineNumber": 0,
+          },
+          "id": 0,
+          "isStateEditable": true,
+          "name": "State",
+          "subHooks": [],
+          "value": false,
+        },
+        {
+          "debugInfo": null,
+          "hookSource": {
+            "columnNumber": 0,
+            "fileName": "**",
+            "functionName": "Foo",
+            "lineNumber": 0,
+          },
+          "id": 1,
+          "isStateEditable": false,
+          "name": "Transition",
+          "subHooks": [],
+          "value": true,
+        },
+        {
+          "debugInfo": null,
+          "hookSource": {
+            "columnNumber": 0,
+            "fileName": "**",
+            "functionName": "Foo",
+            "lineNumber": 0,
+          },
+          "id": 2,
+          "isStateEditable": false,
+          "name": "Memo",
+          "subHooks": [],
+          "value": "hello",
+        },
+        {
+          "debugInfo": null,
+          "hookSource": {
+            "columnNumber": 0,
+            "fileName": "**",
+            "functionName": "Foo",
+            "lineNumber": 0,
+          },
+          "id": 3,
           "isStateEditable": false,
           "name": "Memo",
           "subHooks": [],
@@ -1883,7 +2045,7 @@ describe('ReactHooksInspectionIntegration', () => {
           '1. You might have mismatching versions of React and the renderer (such as React DOM)\n' +
           '2. You might be breaking the Rules of Hooks\n' +
           '3. You might have more than one copy of React in the same app\n' +
-          'See https://reactjs.org/link/invalid-hook-call for tips about how to debug and fix this problem.',
+          'See https://react.dev/link/invalid-hook-call for tips about how to debug and fix this problem.',
       );
       didCatch = true;
     }

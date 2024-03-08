@@ -88,21 +88,19 @@ import {getValueDescriptorExpectingObjectForWarning} from '../shared/ReactDOMRes
 import {NotPending} from '../shared/ReactDOMFormActions';
 
 import ReactDOMSharedInternals from 'shared/ReactDOMSharedInternals';
-const ReactDOMCurrentDispatcher = ReactDOMSharedInternals.Dispatcher;
+const ReactDOMCurrentDispatcher =
+  ReactDOMSharedInternals.ReactDOMCurrentDispatcher;
 
-const ReactDOMServerDispatcher = {
+const previousDispatcher = ReactDOMCurrentDispatcher.current;
+ReactDOMCurrentDispatcher.current = {
   prefetchDNS,
   preconnect,
   preload,
   preloadModule,
-  preinitStyle,
   preinitScript,
+  preinitStyle,
   preinitModuleScript,
 };
-
-export function prepareHostDispatcher() {
-  ReactDOMCurrentDispatcher.current = ReactDOMServerDispatcher;
-}
 
 // We make every property of the descriptor optional because it is not a contract that
 // the headers provided by onHeaders has any particular header types.
@@ -1454,7 +1452,7 @@ function pushInnerHTML(
     if (typeof innerHTML !== 'object' || !('__html' in innerHTML)) {
       throw new Error(
         '`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`. ' +
-          'Please visit https://reactjs.org/link/dangerously-set-inner-html ' +
+          'Please visit https://react.dev/link/dangerously-set-inner-html ' +
           'for more information.',
       );
     }
@@ -1573,7 +1571,7 @@ function pushStartSelect(
           '(specify either the value prop, or the defaultValue prop, but not ' +
           'both). Decide between using a controlled or uncontrolled select ' +
           'element and remove one of these props. More info: ' +
-          'https://reactjs.org/link/controlled-components',
+          'https://react.dev/link/controlled-components',
       );
       didWarnDefaultSelectValue = true;
     }
@@ -2019,7 +2017,7 @@ function pushInput(
           '(specify either the checked prop, or the defaultChecked prop, but not ' +
           'both). Decide between using a controlled or uncontrolled input ' +
           'element and remove one of these props. More info: ' +
-          'https://reactjs.org/link/controlled-components',
+          'https://react.dev/link/controlled-components',
         'A component',
         props.type,
       );
@@ -2032,7 +2030,7 @@ function pushInput(
           '(specify either the value prop, or the defaultValue prop, but not ' +
           'both). Decide between using a controlled or uncontrolled input ' +
           'element and remove one of these props. More info: ' +
-          'https://reactjs.org/link/controlled-components',
+          'https://react.dev/link/controlled-components',
         'A component',
         props.type,
       );
@@ -2167,7 +2165,7 @@ function pushStartTextArea(
           '(specify either the value prop, or the defaultValue prop, but not ' +
           'both). Decide between using a controlled or uncontrolled textarea ' +
           'and remove one of these props. More info: ' +
-          'https://reactjs.org/link/controlled-components',
+          'https://react.dev/link/controlled-components',
       );
       didWarnDefaultTextareaValue = true;
     }
@@ -3500,7 +3498,7 @@ function pushStartPreformattedElement(
     if (typeof innerHTML !== 'object' || !('__html' in innerHTML)) {
       throw new Error(
         '`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`. ' +
-          'Please visit https://reactjs.org/link/dangerously-set-inner-html ' +
+          'Please visit https://react.dev/link/dangerously-set-inner-html ' +
           'for more information.',
       );
     }
@@ -3710,7 +3708,7 @@ export function pushStartInstance(
       return pushSelfClosing(target, props, type);
     }
     // These are reserved SVG and MathML elements, that are never custom elements.
-    // https://w3c.github.io/webcomponents/spec/custom/#custom-elements-core-concepts
+    // https://html.spec.whatwg.org/multipage/custom-elements.html#custom-elements-core-concepts
     case 'annotation-xml':
     case 'color-profile':
     case 'font-face':
@@ -5342,6 +5340,7 @@ function prefetchDNS(href: string) {
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
+    previousDispatcher.prefetchDNS(href);
     return;
   }
   const resumableState = getResumableState(request);
@@ -5397,6 +5396,7 @@ function preconnect(href: string, crossOrigin: ?CrossOriginEnum) {
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
+    previousDispatcher.preconnect(href, crossOrigin);
     return;
   }
   const resumableState = getResumableState(request);
@@ -5460,6 +5460,7 @@ function preload(href: string, as: string, options?: ?PreloadImplOptions) {
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
+    previousDispatcher.preload(href, as, options);
     return;
   }
   const resumableState = getResumableState(request);
@@ -5663,6 +5664,7 @@ function preloadModule(
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
+    previousDispatcher.preloadModule(href, options);
     return;
   }
   const resumableState = getResumableState(request);
@@ -5739,6 +5741,7 @@ function preinitStyle(
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
+    previousDispatcher.preinitStyle(href, precedence, options);
     return;
   }
   const resumableState = getResumableState(request);
@@ -5826,6 +5829,7 @@ function preinitScript(src: string, options?: ?PreinitScriptOptions): void {
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
+    previousDispatcher.preinitScript(src, options);
     return;
   }
   const resumableState = getResumableState(request);
@@ -5891,6 +5895,7 @@ function preinitModuleScript(
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
+    previousDispatcher.preinitModuleScript(src, options);
     return;
   }
   const resumableState = getResumableState(request);
