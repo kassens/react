@@ -880,8 +880,9 @@ describe('ReactErrorBoundaries', () => {
   });
 
   // @gate !disableModulePatternComponents
-  // @gate !disableLegacyContext
   it('renders an error state if module-style context provider throws in componentWillMount', async () => {
+    // Test can be removed when disableLegacyContext is removed, but doesn't
+    // need gating because it doesn't assert on context behavior.
     function BrokenComponentWillMountWithContext() {
       return {
         getChildContext() {
