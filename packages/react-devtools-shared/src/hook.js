@@ -18,7 +18,7 @@ import type {
   DevToolsBackend,
 } from './backend/types';
 
-declare var window: any;
+declare const window: any;
 
 export function installHook(target: any): DevToolsHook | null {
   if (target.hasOwnProperty('__REACT_DEVTOOLS_GLOBAL_HOOK__')) {
