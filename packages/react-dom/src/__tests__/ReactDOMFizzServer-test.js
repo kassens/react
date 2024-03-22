@@ -6201,7 +6201,6 @@ describe('ReactDOMFizzServer', () => {
     expect(getVisibleChildren(container)).toEqual('Hi');
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   it('useFormState hydrates without a mismatch', async () => {
     // This is testing an implementation detail: useFormState emits comment
@@ -6255,7 +6254,6 @@ describe('ReactDOMFizzServer', () => {
     expect(childRef.current).toBe(child);
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   it("useFormState hydrates without a mismatch if there's a render phase update", async () => {
     async function action(state) {

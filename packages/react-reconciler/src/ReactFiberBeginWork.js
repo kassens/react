@@ -106,7 +106,6 @@ import {
   enableLegacyHidden,
   enableCPUSuspense,
   enableFloat,
-  enableFormActions,
   enableAsyncActions,
   enablePostpone,
   enableRenderableContext,
@@ -1544,7 +1543,7 @@ function updateHostComponent(
     workInProgress.flags |= ContentReset;
   }
 
-  if (enableFormActions && enableAsyncActions) {
+  if (enableAsyncActions) {
     const memoizedState = workInProgress.memoizedState;
     if (memoizedState !== null) {
       // This fiber has been upgraded to a stateful component. The only way

@@ -93,7 +93,6 @@ import {
   enableScopeAPI,
   enableFloat,
   enableTrustedTypesIntegration,
-  enableFormActions,
   enableAsyncActions,
 } from 'shared/ReactFeatureFlags';
 import {
@@ -1041,11 +1040,7 @@ export function canHydrateInstance(
     if (element.nodeName.toLowerCase() !== type.toLowerCase()) {
       if (!inRootOrSingleton) {
         // Usually we error for mismatched tags.
-        if (
-          enableFormActions &&
-          element.nodeName === 'INPUT' &&
-          (element: any).type === 'hidden'
-        ) {
+        if (element.nodeName === 'INPUT' && (element: any).type === 'hidden') {
           // If we have extra hidden inputs, we don't mismatch. This allows us to embed
           // extra form data in the original form.
         } else {
@@ -1055,11 +1050,7 @@ export function canHydrateInstance(
       // In root or singleton parents we skip past mismatched instances.
     } else if (!inRootOrSingleton) {
       // Match
-      if (
-        enableFormActions &&
-        type === 'input' &&
-        (element: any).type === 'hidden'
-      ) {
+      if (type === 'input' && (element: any).type === 'hidden') {
         if (__DEV__) {
           checkAttributeStringCoercion(anyProps.name, 'name');
         }
@@ -1191,7 +1182,6 @@ export function canHydrateTextInstance(
 
   while (instance.nodeType !== TEXT_NODE) {
     if (
-      enableFormActions &&
       instance.nodeType === ELEMENT_NODE &&
       instance.nodeName === 'INPUT' &&
       (instance: any).type === 'hidden'
@@ -1317,8 +1307,7 @@ function getNextHydratable(node: ?Node) {
         nodeData === SUSPENSE_START_DATA ||
         nodeData === SUSPENSE_FALLBACK_START_DATA ||
         nodeData === SUSPENSE_PENDING_START_DATA ||
-        (enableFormActions &&
-          enableAsyncActions &&
+        (enableAsyncActions &&
           (nodeData === FORM_STATE_IS_MATCHING ||
             nodeData === FORM_STATE_IS_NOT_MATCHING))
       ) {
@@ -1513,9 +1502,7 @@ export function commitHydratedSuspenseInstance(
 export function shouldDeleteUnhydratedTailInstances(
   parentType: string,
 ): boolean {
-  return (
-    !enableFormActions || (parentType !== 'form' && parentType !== 'button')
-  );
+  return parentType !== 'form' && parentType !== 'button';
 }
 
 export function didNotMatchHydratedContainerTextInstance(
