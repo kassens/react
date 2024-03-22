@@ -38,8 +38,7 @@ describe('react-dom-server-rendering-stub', () => {
     expect(ReactDOM.unstable_runWithPriority).toBe(undefined);
   });
 
-  // @gate enableFloat
-  it('provides preload, preloadModule, preinit, and preinitModule exports', async () => {
+    it('provides preload, preloadModule, preinit, and preinitModule exports', async () => {
     function App() {
       ReactDOM.preload('foo', {as: 'style'});
       ReactDOM.preloadModule('foomodule');
