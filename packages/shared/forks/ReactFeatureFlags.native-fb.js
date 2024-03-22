@@ -23,6 +23,7 @@ export const {
   alwaysThrottleRetries,
   consoleManagedByDevToolsDuringStrictMode,
   enableAsyncActions,
+  enableBigIntSupport,
   enableComponentStackLocations,
   enableDeferRootSchedulingToMicrotask,
   enableInfiniteRenderLoopDetection,
@@ -102,8 +103,6 @@ export const disableStringRefs = false;
 
 export const enableReactTestRendererWarning = false;
 export const disableLegacyMode = false;
-
-export const enableBigIntSupport = false;
 
 // Flow magic to verify the exports of this file match the original version.
 ((((null: any): ExportsType): FeatureFlagsType): ExportsType);
