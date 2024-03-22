@@ -900,7 +900,7 @@ describe('ReactFlightDOMForm', () => {
     );
 
     function Form({action}) {
-      const [errorMsg, dispatch] = useFormState(action, null);
+      const [errorMsg, dispatch] = useActionState(action, null);
       return <form action={dispatch}>{errorMsg}</form>;
     }
 
