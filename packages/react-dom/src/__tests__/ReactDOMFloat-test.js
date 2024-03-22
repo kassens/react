@@ -400,7 +400,6 @@ describe('ReactDOMFloat', () => {
     }
   }
 
-  // @gate enableFloat
   it('can render resources before singletons', async () => {
     const root = ReactDOMClient.createRoot(document);
     root.render(
@@ -433,7 +432,6 @@ describe('ReactDOMFloat', () => {
     );
   });
 
-  // @gate enableFloat
   it('can hydrate non Resources in head when Resources are also inserted there', async () => {
     await act(() => {
       const {pipe} = renderToPipeableStream(
@@ -499,7 +497,7 @@ describe('ReactDOMFloat', () => {
     );
   });
 
-  // @gate enableFloat || !__DEV__
+  // @gate !__DEV__
   it('warns if you render resource-like elements above <head> or <body>', async () => {
     const root = ReactDOMClient.createRoot(document);
 
@@ -631,7 +629,6 @@ describe('ReactDOMFloat', () => {
     );
   });
 
-  // @gate enableFloat
   it('can acquire a resource after releasing it in the same commit', async () => {
     const root = ReactDOMClient.createRoot(container);
     root.render(
@@ -671,7 +668,6 @@ describe('ReactDOMFloat', () => {
     );
   });
 
-  // @gate enableFloat
   it('emits an implicit <head> element to hold resources when none is rendered but an <html> is rendered', async () => {
     const chunks = [];
 
@@ -697,7 +693,6 @@ describe('ReactDOMFloat', () => {
     ]);
   });
 
-  // @gate enableFloat
   it('dedupes if the external runtime is explicitly loaded using preinit', async () => {
     const unstable_externalRuntimeSrc = 'src-of-external-runtime';
     function App() {
@@ -731,7 +726,6 @@ describe('ReactDOMFloat', () => {
     ).toEqual(['<script src="src-of-external-runtime" async=""></script>']);
   });
 
-  // @gate enableFloat
   it('can send style insertion implementation independent of boundary commpletion instruction implementation', async () => {
     await act(() => {
       renderToPipeableStream(
@@ -790,7 +784,6 @@ describe('ReactDOMFloat', () => {
     );
   });
 
-  // @gate enableFloat
   it('can avoid inserting a late stylesheet if it already rendered on the client', async () => {
     await act(() => {
       renderToPipeableStream(
@@ -911,7 +904,6 @@ describe('ReactDOMFloat', () => {
     );
   });
 
-  // @gate enableFloat
   it('can hoist <link rel="stylesheet" .../> and <style /> tags together, respecting order of discovery', async () => {
     const css = `
 body {
@@ -1196,7 +1188,6 @@ body {
     );
   });
 
-  // @gate enableFloat
   it('client renders a boundary if a style Resource dependency fails to load', async () => {
     function App() {
       return (
@@ -1298,7 +1289,6 @@ body {
     ]);
   });
 
-  // @gate enableFloat
   it('treats stylesheet links with a precedence as a resource', async () => {
     await act(() => {
       const {pipe} = renderToPipeableStream(
@@ -1339,7 +1329,6 @@ body {
     );
   });
 
-  // @gate enableFloat
   it('inserts text separators following text when followed by an element that is converted to a resource and thus removed from the html inline', async () => {
     // If you render many of these as siblings the values get emitted as a single text with no separator sometimes
     // because the link gets elided as a resource
@@ -1386,7 +1375,6 @@ body {
     );
   });
 
-  // @gate enableFloat
   it('hoists late stylesheets the correct precedence', async () => {
     function PresetPrecedence() {
       ReactDOM.preinit('preset', {as: 'style', precedence: 'preset'});
@@ -1671,7 +1659,6 @@ body {
     );
   });
 
-  // @gate enableFloat
   it('normalizes stylesheet resource precedence for all boundaries inlined as part of the shell flush', async () => {
     await act(() => {
       const {pipe} = renderToPipeableStream(
@@ -1755,7 +1742,6 @@ body {
     );
   });
 
-  // @gate enableFloat
   it('stylesheet resources are inserted according to precedence order on the client', async () => {
     await act(() => {
       const {pipe} = renderToPipeableStream(
@@ -1836,7 +1822,6 @@ body {
     );
   });
 
-  // @gate enableFloat
   it('inserts preloads in render phase eagerly', async () => {
     function Throw() {
       throw new Error('Uh oh!');
@@ -1878,7 +1863,6 @@ body {
     );
   });
 
-  // @gate enableFloat
   it('will include child boundary stylesheet resources in the boundary reveal instruction', async () => {
     await act(() => {
       const {pipe} = renderToPipeableStream(
@@ -1997,7 +1981,6 @@ body {
     );
   });
 
-  // @gate enableFloat
   it('will hoist resources of child boundaries emitted as part of a partial boundary to the parent boundary', async () => {
     await act(() => {
       const {pipe} = renderToPipeableStream(
@@ -2161,7 +2144,6 @@ body {
     );
   });
 
-  // @gate enableFloat
   it('encodes attributes consistently whether resources are flushed in shell or in late boundaries', async () => {
     function App() {
       return (
@@ -2305,7 +2287,6 @@ body {
     );
   });
 
-  // @gate enableFloat
   it('boundary stylesheet resource dependencies hoist to a parent boundary when flushed inline', async () => {
     await act(() => {
       const {pipe} = renderToPipeableStream(
@@ -2428,7 +2409,6 @@ body {
     );
   });
 
-  // @gate enableFloat
   it('always enforces crossOrigin "anonymous" for font preloads', async () => {
     function App() {
       ReactDOM.preload('foo', {as: 'font', type: 'font/woff2'});
@@ -2619,7 +2599,6 @@ body {
     ]);
   });
 
-  // @gate enableFloat
   it('can hydrate resources and components in the head and body even if a browser or 3rd party script injects extra html nodes', async () => {
     // This is a stress test case for hydrating a complex combination of hoistable elements, hoistable resources and host components
     // in an environment that has been manipulated by 3rd party scripts/extensions to modify the <head> and <body>
@@ -5195,7 +5174,6 @@ body {
   });
 
   describe('ReactDOM.preload(href, { as: ... })', () => {
-    // @gate enableFloat
     it('creates a preload resource when called', async () => {
       function App() {
         ReactDOM.preload('foo', {as: 'style'});
@@ -5284,7 +5262,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('can seed connection props for stylesheet and script resources', async () => {
       function App() {
         ReactDOM.preload('foo', {
@@ -5326,7 +5303,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('warns if you do not pass in a valid href argument or options argument', async () => {
       function App() {
         ReactDOM.preload();
@@ -5629,7 +5605,6 @@ body {
   });
 
   describe('ReactDOM.preinit(href, { as: ... })', () => {
-    // @gate enableFloat
     it('creates a stylesheet resource when ReactDOM.preinit(..., {as: "style" }) is called', async () => {
       function App() {
         ReactDOM.preinit('foo', {as: 'style'});
@@ -5713,7 +5688,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('creates a stylesheet resource in the ownerDocument when ReactDOM.preinit(..., {as: "style" }) is called outside of render on the client', async () => {
       function App() {
         React.useEffect(() => {
@@ -5739,7 +5713,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('creates a stylesheet resource in the ownerDocument when ReactDOM.preinit(..., {as: "style" }) is called outside of render on the client', async () => {
       // This is testing behavior, but it shows that it is not a good idea to preinit inside a shadowRoot. The point is we are asserting a behavior
       // you would want to avoid in a real app.
@@ -5783,7 +5756,6 @@ body {
       expect(getMeaningfulChildren(shadow)).toEqual(<div>shadow</div>);
     });
 
-    // @gate enableFloat
     it('creates a script resource when ReactDOM.preinit(..., {as: "script" }) is called', async () => {
       function App() {
         ReactDOM.preinit('foo', {as: 'script'});
@@ -5861,7 +5833,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('creates a script resource when ReactDOM.preinit(..., {as: "script" }) is called outside of render on the client', async () => {
       function App() {
         React.useEffect(() => {
@@ -5887,7 +5858,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('warns if you do not pass in a valid href argument or options argument', async () => {
       function App() {
         ReactDOM.preinit();
@@ -6296,7 +6266,6 @@ body {
   });
 
   describe('Stylesheet Resources', () => {
-    // @gate enableFloat
     it('treats link rel stylesheet elements as a stylesheet resource when it includes a precedence when server rendering', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -6323,7 +6292,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('treats link rel stylesheet elements as a stylesheet resource when it includes a precedence when client rendering', async () => {
       const root = ReactDOMClient.createRoot(document);
       root.render(
@@ -6349,7 +6317,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('treats link rel stylesheet elements as a stylesheet resource when it includes a precedence when hydrating', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -6387,7 +6354,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('hoists stylesheet resources to the correct precedence', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -6449,7 +6415,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('retains styles even after the last referring Resource unmounts', async () => {
       // This test is true until a future update where there is some form of garbage collection.
       const root = ReactDOMClient.createRoot(document);
@@ -6482,7 +6447,7 @@ body {
       );
     });
 
-    // @gate enableFloat && enableClientRenderFallbackOnTextMismatch
+    // @gate enableClientRenderFallbackOnTextMismatch
     it('retains styles even when a new html, head, and/body mount', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -6534,7 +6499,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('retains styles in head through head remounts', async () => {
       const root = ReactDOMClient.createRoot(document);
       root.render(
@@ -6585,7 +6549,6 @@ body {
         </html>,
       );
     });
-    // @gate enableFloat
     it('can support styles inside portals to a shadowRoot', async () => {
       const shadow = document.body.attachShadow({mode: 'open'});
       const root = ReactDOMClient.createRoot(container);
@@ -6629,7 +6592,6 @@ body {
         <div>shadow</div>,
       ]);
     });
-    // @gate enableFloat
     it('can support styles inside portals to an element in shadowRoots', async () => {
       const template = document.createElement('template');
       template.innerHTML =
@@ -6699,7 +6661,6 @@ body {
       ]);
     });
 
-    // @gate enableFloat
     it('escapes hrefs when selecting matching elements in the document when rendering Resources', async () => {
       function App() {
         ReactDOM.preload('preload', {as: 'style'});
@@ -6767,7 +6728,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('escapes hrefs when selecting matching elements in the document when using preload and preinit', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -6830,7 +6790,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('does not create stylesheet resources when inside an <svg> context', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -6891,7 +6850,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('does not create stylesheet resources when inside a <noscript> context', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -6933,7 +6891,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('warns if you provide a `precedence` prop with other props that invalidate the creation of a stylesheet resource', async () => {
       await expect(async () => {
         await act(() => {
@@ -7006,7 +6963,6 @@ body {
       ]);
     });
 
-    // @gate enableFloat
     it('will not block displaying a Suspense boundary on a stylesheet with media that does not match', async () => {
       await act(() => {
         renderToPipeableStream(
@@ -7123,7 +7079,6 @@ body {
   });
 
   describe('Style Resource', () => {
-    // @gate enableFloat
     it('treats <style href="..." precedence="..."> elements as a style resource when server rendering', async () => {
       const css = `
 body {
@@ -7153,7 +7108,6 @@ body {
       );
     });
 
-    // @gate enableFloat
     it('can insert style resources as part of a boundary reveal', async () => {
       const cssRed = `
 body {
@@ -7269,7 +7223,6 @@ background-color: green;
       );
     });
 
-    // @gate enableFloat
     it('can emit styles early when a partial boundary flushes', async () => {
       const css = 'body { background-color: red; }';
       await act(() => {
@@ -7601,7 +7554,6 @@ background-color: green;
   });
 
   describe('Script Resources', () => {
-    // @gate enableFloat
     it('treats async scripts without onLoad or onError as Resources', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -7681,7 +7633,6 @@ background-color: green;
       );
     });
 
-    // @gate enableFloat
     it('does not create script resources when inside an <svg> context', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -7742,7 +7693,6 @@ background-color: green;
       );
     });
 
-    // @gate enableFloat
     it('does not create script resources when inside a <noscript> context', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -7786,7 +7736,6 @@ background-color: green;
   });
 
   describe('Hoistables', () => {
-    // @gate enableFloat
     it('can hoist meta tags on the server and hydrate them on the client', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -7840,7 +7789,6 @@ background-color: green;
       );
     });
 
-    // @gate enableFloat
     it('can hoist meta tags on the client', async () => {
       const root = ReactDOMClient.createRoot(container);
       await act(() => {
@@ -7862,7 +7810,6 @@ background-color: green;
       expect(getMeaningfulChildren(document.head)).toEqual(undefined);
     });
 
-    // @gate enableFloat
     it('can hoist link (non-stylesheet) tags on the server and hydrate them on the client', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -7916,7 +7863,6 @@ background-color: green;
       );
     });
 
-    // @gate enableFloat
     it('can hoist link (non-stylesheet) tags on the client', async () => {
       const root = ReactDOMClient.createRoot(container);
       await act(() => {
@@ -7938,7 +7884,6 @@ background-color: green;
       expect(getMeaningfulChildren(document.head)).toEqual(undefined);
     });
 
-    // @gate enableFloat
     it('can hoist title tags on the server and hydrate them on the client', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -7992,7 +7937,6 @@ background-color: green;
       );
     });
 
-    // @gate enableFloat
     it('can hoist title tags on the client', async () => {
       const root = ReactDOMClient.createRoot(container);
       await act(() => {
@@ -8014,7 +7958,6 @@ background-color: green;
       expect(getMeaningfulChildren(document.head)).toEqual(undefined);
     });
 
-    // @gate enableFloat
     it('prioritizes ordering for certain hoistables over others when rendering on the server', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -8054,7 +7997,6 @@ background-color: green;
       );
     });
 
-    // @gate enableFloat
     it('supports rendering hoistables outside of <html> scope', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -8232,7 +8174,6 @@ background-color: green;
       );
     });
 
-    // @gate enableFloat
     it('does not hoist inside an <svg> context', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -8266,7 +8207,6 @@ background-color: green;
       ]);
     });
 
-    // @gate enableFloat
     it('does not hoist inside noscript context', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -8293,7 +8233,7 @@ background-color: green;
       ]);
     });
 
-    // @gate enableFloat && (enableClientRenderFallbackOnTextMismatch || !__DEV__)
+    // @gate enableClientRenderFallbackOnTextMismatch || !__DEV__
     it('can render a title before a singleton even if that singleton clears its contents', async () => {
       await act(() => {
         const {pipe} = renderToPipeableStream(
@@ -8350,7 +8290,6 @@ background-color: green;
       );
     });
 
-    // @gate enableFloat
     it('can update title tags', async () => {
       const root = ReactDOMClient.createRoot(container);
       await act(() => {
