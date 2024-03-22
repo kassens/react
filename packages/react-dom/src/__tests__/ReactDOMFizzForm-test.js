@@ -76,7 +76,6 @@ describe('ReactDOMFizzForm', () => {
     insertNodesAndExecuteScripts(temp, container, null);
   }
 
-  // @gate enableFormActions
   it('should allow passing a function to form action during SSR', async () => {
     const ref = React.createRef();
     let foo;
@@ -103,7 +102,6 @@ describe('ReactDOMFizzForm', () => {
     expect(foo).toBe('bar');
   });
 
-  // @gate enableFormActions
   it('should allow passing a function to an input/button formAction', async () => {
     const inputRef = React.createRef();
     const buttonRef = React.createRef();
@@ -162,7 +160,7 @@ describe('ReactDOMFizzForm', () => {
     expect(rootActionCalled).toBe(false);
   });
 
-  // @gate enableFormActions || !__DEV__
+  // XXX REMOVE XXX!__DEV__
   it('should warn when passing a function action during SSR and string during hydration', async () => {
     function action(formData) {}
     function App({isClient}) {
@@ -184,7 +182,7 @@ describe('ReactDOMFizzForm', () => {
     );
   });
 
-  // @gate enableFormActions || !__DEV__
+  // XXX REMOVE XXX!__DEV__
   it('should ideally warn when passing a string during SSR and function during hydration', async () => {
     function action(formData) {}
     function App({isClient}) {
@@ -203,7 +201,7 @@ describe('ReactDOMFizzForm', () => {
     });
   });
 
-  // @gate enableFormActions || !__DEV__
+  // XXX REMOVE XXX!__DEV__
   it('should reset form fields after you update away from hydrated function', async () => {
     const formRef = React.createRef();
     const inputRef = React.createRef();
@@ -259,7 +257,7 @@ describe('ReactDOMFizzForm', () => {
     expect(buttonRef.current.hasAttribute('formTarget')).toBe(false);
   });
 
-  // @gate enableFormActions || !__DEV__
+  // XXX REMOVE XXX!__DEV__
   it('should reset form fields after you remove a hydrated function', async () => {
     const formRef = React.createRef();
     const inputRef = React.createRef();
@@ -305,7 +303,7 @@ describe('ReactDOMFizzForm', () => {
     expect(buttonRef.current.hasAttribute('formTarget')).toBe(false);
   });
 
-  // @gate enableFormActions || !__DEV__
+  // XXX REMOVE XXX!__DEV__
   it('should restore the form fields even if they were incorrectly set', async () => {
     const formRef = React.createRef();
     const inputRef = React.createRef();
@@ -368,7 +366,6 @@ describe('ReactDOMFizzForm', () => {
     expect(buttonRef.current.hasAttribute('formTarget')).toBe(false);
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   it('useFormStatus is not pending during server render', async () => {
     function App() {
@@ -384,7 +381,6 @@ describe('ReactDOMFizzForm', () => {
     expect(container.textContent).toBe('Pending: false');
   });
 
-  // @gate enableFormActions
   it('should replay a form action after hydration', async () => {
     let foo;
     function action(formData) {
@@ -412,7 +408,6 @@ describe('ReactDOMFizzForm', () => {
     expect(foo).toBe('bar');
   });
 
-  // @gate enableFormActions
   it('should replay input/button formAction', async () => {
     let rootActionCalled = false;
     let savedTitle = null;
@@ -472,7 +467,6 @@ describe('ReactDOMFizzForm', () => {
     expect(container.textContent).toBe('hi');
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   it('useFormState returns initial state', async () => {
     async function action(state) {
@@ -494,7 +488,6 @@ describe('ReactDOMFizzForm', () => {
     expect(container.textContent).toBe('0');
   });
 
-  // @gate enableFormActions
   it('can provide a custom action on the server for actions', async () => {
     const ref = React.createRef();
     let foo;
@@ -546,7 +539,6 @@ describe('ReactDOMFizzForm', () => {
     expect(foo).toBe('bar');
   });
 
-  // @gate enableFormActions
   it('can provide a custom action on buttons the server for actions', async () => {
     const hiddenRef = React.createRef();
     const inputRef = React.createRef();
@@ -626,7 +618,6 @@ describe('ReactDOMFizzForm', () => {
     expect(foo).toBe('bar');
   });
 
-  // @gate enableFormActions
   it('can hydrate hidden fields in the beginning of a form', async () => {
     const hiddenRef = React.createRef();
 

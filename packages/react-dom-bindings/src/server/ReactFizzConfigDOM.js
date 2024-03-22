@@ -32,7 +32,6 @@ import {
   enableFilterEmptyStringAttributesDOM,
   enableCustomElementPropertySupport,
   enableFloat,
-  enableFormActions,
   enableFizzExternalRuntime,
   enableNewBooleanProps,
 } from 'shared/ReactFeatureFlags';
@@ -1093,7 +1092,7 @@ function pushFormActionAttribute(
   name: any,
 ): void | null | FormData {
   let formData = null;
-  if (enableFormActions && typeof formAction === 'function') {
+  if (typeof formAction === 'function') {
     // Function form actions cannot control the form properties
     if (__DEV__) {
       if (name !== null && !didWarnFormActionName) {
@@ -1887,7 +1886,7 @@ function pushStartForm(
 
   let formData = null;
   let formActionName = null;
-  if (enableFormActions && typeof formAction === 'function') {
+  if (typeof formAction === 'function') {
     // Function form actions cannot control the form properties
     if (__DEV__) {
       if (

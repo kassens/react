@@ -183,7 +183,6 @@ describe('ReactDOMForm', () => {
     });
   }
 
-  // @gate enableFormActions
   it('should allow passing a function to form action', async () => {
     const ref = React.createRef();
     let foo;
@@ -224,7 +223,6 @@ describe('ReactDOMForm', () => {
     expect(foo).toBe('bar2');
   });
 
-  // @gate enableFormActions
   it('should allow passing a function to an input/button formAction', async () => {
     const inputRef = React.createRef();
     const buttonRef = React.createRef();
@@ -317,7 +315,7 @@ describe('ReactDOMForm', () => {
     expect(rootActionCalled).toBe(false);
   });
 
-  // @gate enableFormActions || !__DEV__
+  // XXX REMOVE XXX!__DEV__
   it('should allow preventing default to block the action', async () => {
     const ref = React.createRef();
     let actionCalled = false;
@@ -340,7 +338,6 @@ describe('ReactDOMForm', () => {
     expect(actionCalled).toBe(false);
   });
 
-  // @gate enableFormActions
   it('should only submit the inner of nested forms', async () => {
     const ref = React.createRef();
     let data;
@@ -377,7 +374,6 @@ describe('ReactDOMForm', () => {
     expect(data).toBe('innerinner');
   });
 
-  // @gate enableFormActions
   it('should only submit once if one root is nested inside the other', async () => {
     const ref = React.createRef();
     let outerCalled = 0;
@@ -421,7 +417,6 @@ describe('ReactDOMForm', () => {
     expect(innerCalled).toBe(1);
   });
 
-  // @gate enableFormActions
   it('should only submit once if a portal is nested inside its own root', async () => {
     const ref = React.createRef();
     let outerCalled = 0;
@@ -465,7 +460,6 @@ describe('ReactDOMForm', () => {
     expect(innerCalled).toBe(1);
   });
 
-  // @gate enableFormActions
   it('can read the clicked button in the formdata event', async () => {
     const inputRef = React.createRef();
     const buttonRef = React.createRef();
@@ -513,7 +507,6 @@ describe('ReactDOMForm', () => {
     expect(buttonRef.current.getAttribute('type')).toBe(null);
   });
 
-  // @gate enableFormActions
   it('excludes the submitter name when the submitter is a function action', async () => {
     const inputRef = React.createRef();
     const buttonRef = React.createRef();
@@ -564,7 +557,7 @@ describe('ReactDOMForm', () => {
     expect(buttonRef.current.getAttribute('type')).toBe(null);
   });
 
-  // @gate enableFormActions || !__DEV__
+  // XXX REMOVE XXX!__DEV__
   it('allows a non-function formaction to override a function one', async () => {
     const ref = React.createRef();
     let actionCalled = false;
@@ -596,7 +589,7 @@ describe('ReactDOMForm', () => {
     expect(actionCalled).toBe(false);
   });
 
-  // @gate enableFormActions || !__DEV__
+  // XXX REMOVE XXX!__DEV__
   it('allows a non-react html formaction to be invoked', async () => {
     let actionCalled = false;
 
@@ -632,7 +625,6 @@ describe('ReactDOMForm', () => {
     expect(actionCalled).toBe(false);
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   it('form actions are transitions', async () => {
     const formRef = React.createRef();
@@ -671,7 +663,6 @@ describe('ReactDOMForm', () => {
     expect(container.textContent).toBe('Updated');
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   it('multiple form actions', async () => {
     const formRef = React.createRef();
@@ -718,7 +709,6 @@ describe('ReactDOMForm', () => {
     expect(container.textContent).toBe('Count: 2');
   });
 
-  // @gate enableFormActions
   it('form actions can be asynchronous', async () => {
     const formRef = React.createRef();
 
@@ -764,7 +754,7 @@ describe('ReactDOMForm', () => {
   });
 
   it('sync errors in form actions can be captured by an error boundary', async () => {
-    if (gate(flags => !(flags.enableFormActions && flags.enableAsyncActions))) {
+    if (gate(flags => !flags.enableAsyncActions)) {
       // TODO: Uncaught JSDOM errors fail the test after the scope has finished
       // so don't work with the `gate` mechanism.
       return;
@@ -810,7 +800,7 @@ describe('ReactDOMForm', () => {
   });
 
   it('async errors in form actions can be captured by an error boundary', async () => {
-    if (gate(flags => !(flags.enableFormActions && flags.enableAsyncActions))) {
+    if (gate(flags => !flags.enableAsyncActions)) {
       // TODO: Uncaught JSDOM errors fail the test after the scope has finished
       // so don't work with the `gate` mechanism.
       return;
@@ -861,7 +851,6 @@ describe('ReactDOMForm', () => {
     expect(container.textContent).toBe('Oh no!');
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   it('useFormStatus reads the status of a pending form action', async () => {
     const formRef = React.createRef();
@@ -913,7 +902,6 @@ describe('ReactDOMForm', () => {
     assertLog(['Async action finished', 'No pending action']);
   });
 
-  // @gate enableFormActions
   it('should error if submitting a form manually', async () => {
     const ref = React.createRef();
 
@@ -960,7 +948,6 @@ describe('ReactDOMForm', () => {
     );
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   test('useFormState updates state asynchronously and queues multiple actions', async () => {
     let actionCounter = 0;
@@ -1021,7 +1008,6 @@ describe('ReactDOMForm', () => {
     expect(container.textContent).toBe('2');
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   test('useFormState supports inline actions', async () => {
     let increment;
@@ -1054,7 +1040,6 @@ describe('ReactDOMForm', () => {
     assertLog(['Pending 1', '11']);
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   test('useFormState: dispatch throws if called during render', async () => {
     function App() {
@@ -1071,7 +1056,6 @@ describe('ReactDOMForm', () => {
     });
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   test('queues multiple actions and runs them in order', async () => {
     let action;
@@ -1104,7 +1088,6 @@ describe('ReactDOMForm', () => {
     expect(container.textContent).toBe('D');
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   test('useFormState: works if action is sync', async () => {
     let increment;
@@ -1137,7 +1120,6 @@ describe('ReactDOMForm', () => {
     assertLog(['Pending 1', '11']);
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   test('useFormState: can mix sync and async actions', async () => {
     let action;
@@ -1166,7 +1148,6 @@ describe('ReactDOMForm', () => {
     expect(container.textContent).toBe('E');
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   test('useFormState: error handling (sync action)', async () => {
     let resetErrorBoundary;
@@ -1231,7 +1212,6 @@ describe('ReactDOMForm', () => {
     expect(container.textContent).toBe('B');
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   test('useFormState: error handling (async action)', async () => {
     let resetErrorBoundary;
@@ -1296,7 +1276,6 @@ describe('ReactDOMForm', () => {
     expect(container.textContent).toBe('B');
   });
 
-  // @gate enableFormActions
   // @gate enableAsyncActions
   test('useFormState works in StrictMode', async () => {
     let actionCounter = 0;
