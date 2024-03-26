@@ -44,7 +44,6 @@ export const enableComponentStackLocations = true;
 export const enableLegacyFBSupport = false;
 export const enableFilterEmptyStringAttributesDOM = true;
 export const enableGetInspectorDataForInstanceInProduction = false;
-export const enableRenderableContext = false;
 
 export const enableRetryLaneExpiration = false;
 export const retryLaneExpirationMs = 5000;
@@ -72,7 +71,6 @@ export const enableDeferRootSchedulingToMicrotask = true;
 
 export const enableAsyncActions = true;
 
-export const alwaysThrottleDisappearingFallbacks = true;
 export const alwaysThrottleRetries = true;
 
 export const passChildrenWhenCloningPersistedNodes = false;
@@ -92,12 +90,13 @@ export const enableInfiniteRenderLoopDetection = false;
 const __NEXT_MAJOR__ = __EXPERIMENTAL__;
 export const enableRefAsProp = __NEXT_MAJOR__;
 export const disableStringRefs = __NEXT_MAJOR__;
-export const enableReactTestRendererWarning = false;
 export const enableBigIntSupport = __NEXT_MAJOR__;
 export const disableLegacyMode = __NEXT_MAJOR__;
 export const disableLegacyContext = __NEXT_MAJOR__;
 export const enableNewBooleanProps = __NEXT_MAJOR__;
 export const disableModulePatternComponents = __NEXT_MAJOR__;
+export const enableRenderableContext = __NEXT_MAJOR__;
+export const enableReactTestRendererWarning = __NEXT_MAJOR__;
 
 // Flow magic to verify the exports of this file match the original version.
 ((((null: any): ExportsType): FeatureFlagsType): ExportsType);

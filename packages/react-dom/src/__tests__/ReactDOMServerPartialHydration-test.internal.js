@@ -366,6 +366,775 @@ describe('ReactDOMServerPartialHydration', () => {
     }
   });
 
+  it('does not show a fallback if mismatch is after suspending', async () => {
+    // We can't use the toErrorDev helper here because this is async.
+    const originalConsoleError = console.error;
+    const mockError = jest.fn();
+    console.error = (...args) => {
+      mockError(...args.map(normalizeCodeLocInfo));
+    };
+    let client = false;
+    let suspend = false;
+    let resolve;
+    const promise = new Promise(resolvePromise => {
+      resolve = () => {
+        suspend = false;
+        resolvePromise();
+      };
+    });
+    function Child() {
+      if (suspend) {
+        Scheduler.log('Suspend');
+        throw promise;
+      } else {
+        Scheduler.log('Hello');
+        return 'Hello';
+      }
+    }
+    function Component({shouldMismatch}) {
+      Scheduler.log('Component');
+      if (shouldMismatch && client) {
+        return <article>Mismatch</article>;
+      }
+      return <div>Component</div>;
+    }
+    function Fallback() {
+      Scheduler.log('Fallback');
+      return 'Loading...';
+    }
+    function App() {
+      return (
+        <Suspense fallback={<Fallback />}>
+          <Child />
+          <Component shouldMismatch={true} />
+        </Suspense>
+      );
+    }
+    try {
+      const finalHTML = ReactDOMServer.renderToString(<App />);
+      const container = document.createElement('section');
+      container.innerHTML = finalHTML;
+      assertLog(['Hello', 'Component']);
+
+      expect(container.innerHTML).toBe(
+        '<!--$-->Hello<div>Component</div><!--/$-->',
+      );
+
+      suspend = true;
+      client = true;
+
+      ReactDOMClient.hydrateRoot(container, <App />, {
+        onRecoverableError(error) {
+          Scheduler.log(error.message);
+        },
+      });
+      await waitForAll(['Suspend']);
+      jest.runAllTimers();
+
+      // !! Unchanged, continue showing server content while suspended.
+      expect(container.innerHTML).toBe(
+        '<!--$-->Hello<div>Component</div><!--/$-->',
+      );
+
+      suspend = false;
+      resolve();
+      await promise;
+      await waitForAll([
+        // first pass, mismatches at end
+        'Hello',
+        'Component',
+        'Hello',
+        'Component',
+        'Hydration failed because the initial UI does not match what was rendered on the server.',
+        'There was an error while hydrating this Suspense boundary. Switched to client rendering.',
+      ]);
+      jest.runAllTimers();
+
+      // Client rendered - suspense comment nodes removed.
+      expect(container.innerHTML).toBe('Hello<article>Mismatch</article>');
+      if (__DEV__) {
+        expect(mockError.mock.calls).toEqual([
+          [
+            'Warning: Expected server HTML to contain a matching <%s> in <%s>.%s',
+            'article',
+            'section',
+            '\n' +
+              '    in article (at **)\n' +
+              '    in Component (at **)\n' +
+              '    in Suspense (at **)\n' +
+              '    in App (at **)',
+          ],
+        ]);
+      }
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+
+  it('does not show a fallback if mismatch is child of suspended component', async () => {
+    // We can't use the toErrorDev helper here because this is async.
+    const originalConsoleError = console.error;
+    const mockError = jest.fn();
+    console.error = (...args) => {
+      mockError(...args.map(normalizeCodeLocInfo));
+    };
+    let client = false;
+    let suspend = false;
+    let resolve;
+    const promise = new Promise(resolvePromise => {
+      resolve = () => {
+        suspend = false;
+        resolvePromise();
+      };
+    });
+    function Child({children}) {
+      if (suspend) {
+        Scheduler.log('Suspend');
+        throw promise;
+      } else {
+        Scheduler.log('Hello');
+        return <div>{children}</div>;
+      }
+    }
+    function Component({shouldMismatch}) {
+      Scheduler.log('Component');
+      if (shouldMismatch && client) {
+        return <article>Mismatch</article>;
+      }
+      return <div>Component</div>;
+    }
+    function Fallback() {
+      Scheduler.log('Fallback');
+      return 'Loading...';
+    }
+    function App() {
+      return (
+        <Suspense fallback={<Fallback />}>
+          <Child>
+            <Component shouldMismatch={true} />
+          </Child>
+        </Suspense>
+      );
+    }
+    try {
+      const finalHTML = ReactDOMServer.renderToString(<App />);
+      const container = document.createElement('section');
+      container.innerHTML = finalHTML;
+      assertLog(['Hello', 'Component']);
+
+      expect(container.innerHTML).toBe(
+        '<!--$--><div><div>Component</div></div><!--/$-->',
+      );
+
+      suspend = true;
+      client = true;
+
+      ReactDOMClient.hydrateRoot(container, <App />, {
+        onRecoverableError(error) {
+          Scheduler.log(error.message);
+        },
+      });
+      await waitForAll(['Suspend']);
+      jest.runAllTimers();
+
+      // !! Unchanged, continue showing server content while suspended.
+      expect(container.innerHTML).toBe(
+        '<!--$--><div><div>Component</div></div><!--/$-->',
+      );
+
+      suspend = false;
+      resolve();
+      await promise;
+      await waitForAll([
+        // first pass, mismatches at end
+        'Hello',
+        'Component',
+        'Hello',
+        'Component',
+        'Hydration failed because the initial UI does not match what was rendered on the server.',
+        'There was an error while hydrating this Suspense boundary. Switched to client rendering.',
+      ]);
+      jest.runAllTimers();
+
+      // Client rendered - suspense comment nodes removed
+      expect(container.innerHTML).toBe(
+        '<div><article>Mismatch</article></div>',
+      );
+      if (__DEV__) {
+        expect(mockError.mock.calls).toEqual([
+          [
+            'Warning: Expected server HTML to contain a matching <%s> in <%s>.%s',
+            'article',
+            'div',
+            '\n' +
+              '    in article (at **)\n' +
+              '    in Component (at **)\n' +
+              '    in div (at **)\n' +
+              '    in Child (at **)\n' +
+              '    in Suspense (at **)\n' +
+              '    in App (at **)',
+          ],
+        ]);
+      }
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+
+  it('does not show a fallback if mismatch is parent and first child suspends', async () => {
+    // We can't use the toErrorDev helper here because this is async.
+    const originalConsoleError = console.error;
+    const mockError = jest.fn();
+    console.error = (...args) => {
+      mockError(...args.map(normalizeCodeLocInfo));
+    };
+    let client = false;
+    let suspend = false;
+    let resolve;
+    const promise = new Promise(resolvePromise => {
+      resolve = () => {
+        suspend = false;
+        resolvePromise();
+      };
+    });
+    function Child({children}) {
+      if (suspend) {
+        Scheduler.log('Suspend');
+        throw promise;
+      } else {
+        Scheduler.log('Hello');
+        return <div>{children}</div>;
+      }
+    }
+    function Component({shouldMismatch, children}) {
+      Scheduler.log('Component');
+      if (shouldMismatch && client) {
+        return (
+          <div>
+            {children}
+            <article>Mismatch</article>
+          </div>
+        );
+      }
+      return (
+        <div>
+          {children}
+          <div>Component</div>
+        </div>
+      );
+    }
+    function Fallback() {
+      Scheduler.log('Fallback');
+      return 'Loading...';
+    }
+    function App() {
+      return (
+        <Suspense fallback={<Fallback />}>
+          <Component shouldMismatch={true}>
+            <Child />
+          </Component>
+        </Suspense>
+      );
+    }
+    try {
+      const finalHTML = ReactDOMServer.renderToString(<App />);
+      const container = document.createElement('section');
+      container.innerHTML = finalHTML;
+      assertLog(['Component', 'Hello']);
+
+      expect(container.innerHTML).toBe(
+        '<!--$--><div><div></div><div>Component</div></div><!--/$-->',
+      );
+
+      suspend = true;
+      client = true;
+
+      ReactDOMClient.hydrateRoot(container, <App />, {
+        onRecoverableError(error) {
+          Scheduler.log(error.message);
+        },
+      });
+      await waitForAll(['Component', 'Suspend']);
+      jest.runAllTimers();
+
+      // !! Unchanged, continue showing server content while suspended.
+      expect(container.innerHTML).toBe(
+        '<!--$--><div><div></div><div>Component</div></div><!--/$-->',
+      );
+
+      suspend = false;
+      resolve();
+      await promise;
+      await waitForAll([
+        // first pass, mismatches at end
+        'Component',
+        'Hello',
+        'Component',
+        'Hello',
+        'Hydration failed because the initial UI does not match what was rendered on the server.',
+        'There was an error while hydrating this Suspense boundary. Switched to client rendering.',
+      ]);
+      jest.runAllTimers();
+
+      // Client rendered - suspense comment nodes removed
+      expect(container.innerHTML).toBe(
+        '<div><div></div><article>Mismatch</article></div>',
+      );
+      if (__DEV__) {
+        expect(mockError.mock.calls).toEqual([
+          [
+            'Warning: Expected server HTML to contain a matching <%s> in <%s>.%s',
+            'article',
+            'div',
+            '\n' +
+              '    in article (at **)\n' +
+              '    in div (at **)\n' +
+              '    in Component (at **)\n' +
+              '    in Suspense (at **)\n' +
+              '    in App (at **)',
+          ],
+        ]);
+      }
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+
+  it('does show a fallback if mismatch is parent and second child suspends', async () => {
+    // We can't use the toErrorDev helper here because this is async.
+    const originalConsoleError = console.error;
+    const mockError = jest.fn();
+    console.error = (...args) => {
+      mockError(...args.map(normalizeCodeLocInfo));
+    };
+    let client = false;
+    let suspend = false;
+    let resolve;
+    const promise = new Promise(resolvePromise => {
+      resolve = () => {
+        suspend = false;
+        resolvePromise();
+      };
+    });
+    function Child({children}) {
+      if (suspend) {
+        Scheduler.log('Suspend');
+        throw promise;
+      } else {
+        Scheduler.log('Hello');
+        return <div>{children}</div>;
+      }
+    }
+    function Component({shouldMismatch, children}) {
+      Scheduler.log('Component');
+      if (shouldMismatch && client) {
+        return (
+          <div>
+            <article>Mismatch</article>
+            {children}
+          </div>
+        );
+      }
+      return (
+        <div>
+          <div>Component</div>
+          {children}
+        </div>
+      );
+    }
+    function Fallback() {
+      Scheduler.log('Fallback');
+      return 'Loading...';
+    }
+    function App() {
+      return (
+        <Suspense fallback={<Fallback />}>
+          <Component shouldMismatch={true}>
+            <Child />
+          </Component>
+        </Suspense>
+      );
+    }
+    try {
+      const finalHTML = ReactDOMServer.renderToString(<App />);
+      const container = document.createElement('section');
+      container.innerHTML = finalHTML;
+      assertLog(['Component', 'Hello']);
+
+      expect(container.innerHTML).toBe(
+        '<!--$--><div><div>Component</div><div></div></div><!--/$-->',
+      );
+
+      suspend = true;
+      client = true;
+
+      ReactDOMClient.hydrateRoot(container, <App />, {
+        onRecoverableError(error) {
+          Scheduler.log(error.message);
+        },
+      });
+      await waitForAll([
+        'Component',
+        'Component',
+        'Suspend',
+        'Fallback',
+        'Hydration failed because the initial UI does not match what was rendered on the server.',
+        'There was an error while hydrating this Suspense boundary. Switched to client rendering.',
+      ]);
+      jest.runAllTimers();
+
+      // !! Client switches to suspense fallback.
+      expect(container.innerHTML).toBe('Loading...');
+
+      suspend = false;
+      resolve();
+      await promise;
+      await waitForAll(['Component', 'Hello']);
+      jest.runAllTimers();
+
+      // Client rendered - suspense comment nodes removed
+      expect(container.innerHTML).toBe(
+        '<div><article>Mismatch</article><div></div></div>',
+      );
+      if (__DEV__) {
+        expect(mockError.mock.calls).toEqual([
+          [
+            'Warning: Expected server HTML to contain a matching <%s> in <%s>.%s',
+            'article',
+            'div',
+            '\n' +
+              '    in article (at **)\n' +
+              '    in div (at **)\n' +
+              '    in Component (at **)\n' +
+              '    in Suspense (at **)\n' +
+              '    in App (at **)',
+          ],
+        ]);
+      }
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+
+  it('does show a fallback if mismatch is in parent element only', async () => {
+    // We can't use the toErrorDev helper here because this is async.
+    const originalConsoleError = console.error;
+    const mockError = jest.fn();
+    console.error = (...args) => {
+      mockError(...args.map(normalizeCodeLocInfo));
+    };
+    let client = false;
+    let suspend = false;
+    let resolve;
+    const promise = new Promise(resolvePromise => {
+      resolve = () => {
+        suspend = false;
+        resolvePromise();
+      };
+    });
+    function Child({children}) {
+      if (suspend) {
+        Scheduler.log('Suspend');
+        throw promise;
+      } else {
+        Scheduler.log('Hello');
+        return <div>{children}</div>;
+      }
+    }
+    function Component({shouldMismatch, children}) {
+      Scheduler.log('Component');
+      if (shouldMismatch && client) {
+        return <article>{children}</article>;
+      }
+      return <div>{children}</div>;
+    }
+    function Fallback() {
+      Scheduler.log('Fallback');
+      return 'Loading...';
+    }
+    function App() {
+      return (
+        <Suspense fallback={<Fallback />}>
+          <Component shouldMismatch={true}>
+            <Child />
+          </Component>
+        </Suspense>
+      );
+    }
+    try {
+      const finalHTML = ReactDOMServer.renderToString(<App />);
+      const container = document.createElement('section');
+      container.innerHTML = finalHTML;
+      assertLog(['Component', 'Hello']);
+
+      expect(container.innerHTML).toBe(
+        '<!--$--><div><div></div></div><!--/$-->',
+      );
+
+      suspend = true;
+      client = true;
+
+      ReactDOMClient.hydrateRoot(container, <App />, {
+        onRecoverableError(error) {
+          Scheduler.log(error.message);
+        },
+      });
+      await waitForAll([
+        'Component',
+        'Component',
+        'Suspend',
+        'Fallback',
+        'Hydration failed because the initial UI does not match what was rendered on the server.',
+        'There was an error while hydrating this Suspense boundary. Switched to client rendering.',
+      ]);
+      jest.runAllTimers();
+
+      // !! Client switches to suspense fallback.
+      expect(container.innerHTML).toBe('Loading...');
+
+      suspend = false;
+      resolve();
+      await promise;
+      await waitForAll(['Component', 'Hello']);
+      jest.runAllTimers();
+
+      // Client rendered - suspense comment nodes removed
+      expect(container.innerHTML).toBe('<article><div></div></article>');
+      if (__DEV__) {
+        expect(mockError.mock.calls).toEqual([
+          [
+            'Warning: Expected server HTML to contain a matching <%s> in <%s>.%s',
+            'article',
+            'section',
+            '\n' +
+              '    in article (at **)\n' +
+              '    in Component (at **)\n' +
+              '    in Suspense (at **)\n' +
+              '    in App (at **)',
+          ],
+        ]);
+      }
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+
+  it('does show a fallback if mismatch is before suspending', async () => {
+    // We can't use the toErrorDev helper here because this is async.
+    const originalConsoleError = console.error;
+    const mockError = jest.fn();
+    console.error = (...args) => {
+      mockError(...args.map(normalizeCodeLocInfo));
+    };
+    let client = false;
+    let suspend = false;
+    let resolve;
+    const promise = new Promise(resolvePromise => {
+      resolve = () => {
+        suspend = false;
+        resolvePromise();
+      };
+    });
+    function Child() {
+      if (suspend) {
+        Scheduler.log('Suspend');
+        throw promise;
+      } else {
+        Scheduler.log('Hello');
+        return 'Hello';
+      }
+    }
+    function Component({shouldMismatch}) {
+      Scheduler.log('Component');
+      if (shouldMismatch && client) {
+        return <article>Mismatch</article>;
+      }
+      return <div>Component</div>;
+    }
+    function Fallback() {
+      Scheduler.log('Fallback');
+      return 'Loading...';
+    }
+    function App() {
+      return (
+        <Suspense fallback={<Fallback />}>
+          <Component shouldMismatch={true} />
+          <Child />
+        </Suspense>
+      );
+    }
+    try {
+      const finalHTML = ReactDOMServer.renderToString(<App />);
+      const container = document.createElement('section');
+      container.innerHTML = finalHTML;
+      assertLog(['Component', 'Hello']);
+
+      expect(container.innerHTML).toBe(
+        '<!--$--><div>Component</div>Hello<!--/$-->',
+      );
+
+      suspend = true;
+      client = true;
+
+      ReactDOMClient.hydrateRoot(container, <App />, {
+        onRecoverableError(error) {
+          Scheduler.log(error.message);
+        },
+      });
+      await waitForAll([
+        'Component',
+        'Component',
+        'Suspend',
+        'Fallback',
+        'Hydration failed because the initial UI does not match what was rendered on the server.',
+        'There was an error while hydrating this Suspense boundary. Switched to client rendering.',
+      ]);
+      jest.runAllTimers();
+
+      // !! Client switches to suspense fallback.
+      expect(container.innerHTML).toBe('Loading...');
+
+      suspend = false;
+      resolve();
+      await promise;
+      await waitForAll([
+        // first pass, mismatches at end
+        'Component',
+        'Hello',
+      ]);
+      jest.runAllTimers();
+
+      // Client rendered - suspense comment nodes removed
+      expect(container.innerHTML).toBe('<article>Mismatch</article>Hello');
+      if (__DEV__) {
+        expect(mockError.mock.calls).toEqual([
+          [
+            'Warning: Expected server HTML to contain a matching <%s> in <%s>.%s',
+            'article',
+            'section',
+            '\n' +
+              '    in article (at **)\n' +
+              '    in Component (at **)\n' +
+              '    in Suspense (at **)\n' +
+              '    in App (at **)',
+          ],
+        ]);
+      }
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+
+  it('does show a fallback if mismatch is before suspending in a child', async () => {
+    // We can't use the toErrorDev helper here because this is async.
+    const originalConsoleError = console.error;
+    const mockError = jest.fn();
+    console.error = (...args) => {
+      mockError(...args.map(normalizeCodeLocInfo));
+    };
+    let client = false;
+    let suspend = false;
+    let resolve;
+    const promise = new Promise(resolvePromise => {
+      resolve = () => {
+        suspend = false;
+        resolvePromise();
+      };
+    });
+    function Child() {
+      if (suspend) {
+        Scheduler.log('Suspend');
+        throw promise;
+      } else {
+        Scheduler.log('Hello');
+        return 'Hello';
+      }
+    }
+    function Component({shouldMismatch}) {
+      Scheduler.log('Component');
+      if (shouldMismatch && client) {
+        return <article>Mismatch</article>;
+      }
+      return <div>Component</div>;
+    }
+    function Fallback() {
+      Scheduler.log('Fallback');
+      return 'Loading...';
+    }
+    function App() {
+      return (
+        <Suspense fallback={<Fallback />}>
+          <Component shouldMismatch={true} />
+          <div>
+            <Child />
+          </div>
+        </Suspense>
+      );
+    }
+    try {
+      const finalHTML = ReactDOMServer.renderToString(<App />);
+      const container = document.createElement('section');
+      container.innerHTML = finalHTML;
+      assertLog(['Component', 'Hello']);
+
+      expect(container.innerHTML).toBe(
+        '<!--$--><div>Component</div><div>Hello</div><!--/$-->',
+      );
+
+      suspend = true;
+      client = true;
+
+      ReactDOMClient.hydrateRoot(container, <App />, {
+        onRecoverableError(error) {
+          Scheduler.log(error.message);
+        },
+      });
+      await waitForAll([
+        'Component',
+        'Component',
+        'Suspend',
+        'Fallback',
+        'Hydration failed because the initial UI does not match what was rendered on the server.',
+        'There was an error while hydrating this Suspense boundary. Switched to client rendering.',
+      ]);
+      jest.runAllTimers();
+
+      // !! Client switches to suspense fallback.
+      expect(container.innerHTML).toBe('Loading...');
+
+      suspend = false;
+      resolve();
+      await promise;
+      await waitForAll([
+        // first pass, mismatches at end
+        'Component',
+        'Hello',
+      ]);
+      jest.runAllTimers();
+
+      // Client rendered - suspense comment nodes removed.
+      expect(container.innerHTML).toBe(
+        '<article>Mismatch</article><div>Hello</div>',
+      );
+      if (__DEV__) {
+        expect(mockError.mock.calls).toEqual([
+          [
+            'Warning: Expected server HTML to contain a matching <%s> in <%s>.%s',
+            'article',
+            'section',
+            '\n' +
+              '    in article (at **)\n' +
+              '    in Component (at **)\n' +
+              '    in Suspense (at **)\n' +
+              '    in App (at **)',
+          ],
+        ]);
+      }
+    } finally {
+      console.error = originalConsoleError;
+    }
+  });
+
   it('calls the hydration callbacks after hydration or deletion', async () => {
     let suspend = false;
     let resolve;
@@ -716,75 +1485,6 @@ describe('ReactDOMServerPartialHydration', () => {
 
     // The callback should have been invoked.
     expect(deleted.length).toBe(1);
-  });
-
-  // @gate !disableLegacyMode
-  it('warns and replaces the boundary content in legacy mode', async () => {
-    let suspend = false;
-    let resolve;
-    const promise = new Promise(resolvePromise => (resolve = resolvePromise));
-    const ref = React.createRef();
-
-    function Child() {
-      if (suspend) {
-        throw promise;
-      } else {
-        return 'Hello';
-      }
-    }
-
-    function App() {
-      return (
-        <div>
-          <Suspense fallback="Loading...">
-            <span ref={ref}>
-              <Child />
-            </span>
-          </Suspense>
-        </div>
-      );
-    }
-
-    // Don't suspend on the server.
-    suspend = false;
-    const finalHTML = ReactDOMServer.renderToString(<App />);
-
-    const container = document.createElement('div');
-    container.innerHTML = finalHTML;
-
-    const span = container.getElementsByTagName('span')[0];
-
-    // On the client we try to hydrate.
-    suspend = true;
-    await expect(async () => {
-      await act(() => {
-        ReactDOM.hydrate(<App />, container);
-      });
-    }).toErrorDev(
-      'Warning: Cannot hydrate Suspense in legacy mode. Switch from ' +
-        'ReactDOM.hydrate(element, container) to ' +
-        'ReactDOMClient.hydrateRoot(container, <App />)' +
-        '.render(element) or remove the Suspense components from the server ' +
-        'rendered components.' +
-        '\n    in Suspense (at **)' +
-        '\n    in div (at **)' +
-        '\n    in App (at **)',
-    );
-
-    // We're now in loading state.
-    expect(container.textContent).toBe('Loading...');
-
-    const span2 = container.getElementsByTagName('span')[0];
-    // This is a new node.
-    expect(span).not.toBe(span2);
-    expect(ref.current).toBe(null);
-
-    // Resolving the promise should render the final content.
-    suspend = false;
-    await act(() => resolve());
-
-    // We should now have hydrated with a ref on the existing span.
-    expect(container.textContent).toBe('Hello');
   });
 
   it('can insert siblings before the dehydrated boundary', async () => {

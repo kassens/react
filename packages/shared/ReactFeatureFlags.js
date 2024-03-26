@@ -110,15 +110,11 @@ export const enableUseEffectEventHook = __EXPERIMENTAL__;
 // (handled with an MutationObserver) instead of inline-scripts
 export const enableFizzExternalRuntime = true;
 
-export const alwaysThrottleDisappearingFallbacks = true;
-
 export const alwaysThrottleRetries = true;
 
 export const passChildrenWhenCloningPersistedNodes = false;
 
 export const enableUseDeferredValueInitialArg = __EXPERIMENTAL__;
-
-export const enableRenderableContext = false;
 
 export const enableServerComponentLogs = __EXPERIMENTAL__;
 
@@ -187,10 +183,8 @@ export const enableInfiniteRenderLoopDetection = true;
 export const enableRefAsProp = __NEXT_MAJOR__;
 export const disableStringRefs = __NEXT_MAJOR__;
 
-// Not ready to break experimental yet.
-// Needs more internal cleanup
 // Warn on any usage of ReactTestRenderer
-export const enableReactTestRendererWarning = false;
+export const enableReactTestRendererWarning = __NEXT_MAJOR__;
 
 // Disables legacy mode
 // This allows us to land breaking changes to remove legacy mode APIs in experimental builds
@@ -203,6 +197,9 @@ export const disableLegacyMode = __NEXT_MAJOR__;
 // However, once React considers them as boolean props an empty string will
 // result in false property i.e. break existing usage.
 export const enableNewBooleanProps = __NEXT_MAJOR__;
+
+// Make <Context> equivalent to <Context.Provider> instead of <Context.Consumer>
+export const enableRenderableContext = __NEXT_MAJOR__;
 
 // -----------------------------------------------------------------------------
 // Chopping Block
