@@ -235,7 +235,6 @@ import {
   queueHydrationError,
 } from './ReactFiberHydrationContext';
 import {
-  adoptClassInstance,
   constructClassInstance,
   mountClassInstance,
   resumeMountClassInstance,

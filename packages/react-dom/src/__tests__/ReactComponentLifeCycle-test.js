@@ -14,7 +14,6 @@ let act;
 let React;
 let ReactDOM;
 let ReactDOMClient;
-let PropTypes;
 let findDOMNode;
 
 const clone = function (o) {
@@ -99,7 +98,6 @@ describe('ReactComponentLifeCycle', () => {
     findDOMNode =
       ReactDOM.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.findDOMNode;
     ReactDOMClient = require('react-dom/client');
-    PropTypes = require('prop-types');
   });
 
   it('should not reuse an instance when it has been unmounted', async () => {

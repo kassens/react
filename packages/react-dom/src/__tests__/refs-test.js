@@ -11,7 +11,6 @@
 
 let React = require('react');
 let ReactDOMClient = require('react-dom/client');
-let ReactFeatureFlags = require('shared/ReactFeatureFlags');
 let act = require('internal-test-utils').act;
 
 // This is testing if string refs are deleted from `instance.refs`
@@ -24,7 +23,6 @@ describe('reactiverefs', () => {
     jest.resetModules();
     React = require('react');
     ReactDOMClient = require('react-dom/client');
-    ReactFeatureFlags = require('shared/ReactFeatureFlags');
     act = require('internal-test-utils').act;
   });
 
@@ -204,7 +202,6 @@ describe('ref swapping', () => {
     jest.resetModules();
     React = require('react');
     ReactDOMClient = require('react-dom/client');
-    ReactFeatureFlags = require('shared/ReactFeatureFlags');
     act = require('internal-test-utils').act;
 
     RefHopsAround = class extends React.Component {
