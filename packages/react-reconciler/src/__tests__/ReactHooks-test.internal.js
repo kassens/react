@@ -1308,16 +1308,6 @@ describe('ReactHooks', () => {
       return <div />;
     });
 
-    function Factory() {
-      return {
-        state: {},
-        render() {
-          renderCount++;
-          return <div />;
-        },
-      };
-    }
-
     let renderer;
     await act(() => {
       renderer = ReactTestRenderer.create(null, {unstable_isConcurrent: true});
