@@ -88,7 +88,6 @@ export const enableInfiniteRenderLoopDetection = false;
 const __NEXT_MAJOR__ = __EXPERIMENTAL__;
 export const enableRefAsProp = __NEXT_MAJOR__;
 export const disableStringRefs = __NEXT_MAJOR__;
-export const enableBigIntSupport = __NEXT_MAJOR__;
 export const disableLegacyMode = __NEXT_MAJOR__;
 export const disableLegacyContext = __NEXT_MAJOR__;
 export const disableDOMTestUtils = __NEXT_MAJOR__;
