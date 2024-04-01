@@ -19,9 +19,7 @@ export const {
   disableIEWorkarounds,
   enableBigIntSupport,
   enableTrustedTypesIntegration,
-  enableLegacyFBSupport,
   enableDebugTracing,
-  enableUseRefAccessWarning,
   enableLazyContextPropagation,
   enableUnifiedSyncLane,
   enableRetryLaneExpiration,
@@ -117,6 +115,8 @@ export const disableStringRefs = false;
 export const disableLegacyMode = false;
 
 export const disableDOMTestUtils = false;
+
+export const enableLegacyFBSupport = true;
 
 // Flow magic to verify the exports of this file match the original version.
 ((((null: any): ExportsType): FeatureFlagsType): ExportsType);
