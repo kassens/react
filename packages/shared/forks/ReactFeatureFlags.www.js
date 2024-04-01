@@ -19,7 +19,6 @@ export const {
   disableIEWorkarounds,
   enableBigIntSupport,
   enableTrustedTypesIntegration,
-  enableLegacyFBSupport,
   enableDebugTracing,
   enableUseRefAccessWarning,
   enableLazyContextPropagation,
@@ -58,6 +57,7 @@ export const enableUseMemoCacheHook = true;
 export const enableUseEffectEventHook = true;
 export const enableFilterEmptyStringAttributesDOM = true;
 export const enableAsyncActions = true;
+export const enableLegacyFBSupport = true;
 
 // Logs additional User Timing API marks for use with an experimental profiling tool.
 export const enableSchedulingProfiler: boolean =
