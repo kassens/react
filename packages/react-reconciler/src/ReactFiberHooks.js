@@ -2328,23 +2328,6 @@ function createEffectInstance(): EffectInstance {
   return {destroy: undefined};
 }
 
-let stackContainsErrorMessage: boolean | null = null;
-
-function getCallerStackFrame(): string {
-  // eslint-disable-next-line react-internal/prod-error-codes
-  const stackFrames = new Error('Error message').stack.split('\n');
-
-  // Some browsers (e.g. Chrome) include the error message in the stack
-  // but others (e.g. Firefox) do not.
-  if (stackContainsErrorMessage === null) {
-    stackContainsErrorMessage = stackFrames[0].includes('Error message');
-  }
-
-  return stackContainsErrorMessage
-    ? stackFrames.slice(3, 4).join('\n')
-    : stackFrames.slice(2, 3).join('\n');
-}
-
 function mountRef<T>(initialValue: T): {current: T} {
   const hook = mountWorkInProgressHook();
   const ref = {current: initialValue};

@@ -14,7 +14,6 @@ let useSyncExternalStoreWithSelector;
 let React;
 let ReactDOM;
 let ReactDOMClient;
-let ReactFeatureFlags;
 let Scheduler;
 let act;
 let useState;
@@ -54,7 +53,6 @@ describe('Shared useSyncExternalStore behavior (shim and built-in)', () => {
     React = require('react');
     ReactDOM = require('react-dom');
     ReactDOMClient = require('react-dom/client');
-    ReactFeatureFlags = require('shared/ReactFeatureFlags');
     Scheduler = require('scheduler');
     useState = React.useState;
     useEffect = React.useEffect;
