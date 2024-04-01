@@ -17,7 +17,6 @@ const dynamicFeatureFlags: DynamicFeatureFlags = require('ReactFeatureFlags');
 export const {
   disableInputAttributeSyncing,
   disableIEWorkarounds,
-  enableBigIntSupport,
   enableTrustedTypesIntegration,
   enableLegacyFBSupport,
   enableDebugTracing,
