@@ -28,7 +28,6 @@ export const {
   enableInfiniteRenderLoopDetection,
   enableRenderableContext,
   enableUnifiedSyncLane,
-  enableUseRefAccessWarning,
   passChildrenWhenCloningPersistedNodes,
   useModernStrictMode,
 } = dynamicFlags;
