@@ -72,6 +72,7 @@ export const enableSchedulingProfiler = __PROFILE__;
 export const enableLegacyCache = false;
 export const enableFetchInstrumentation = false;
 export const enablePostpone = false;
+export const enableObjectFiber = false;
 export const disableCommentsAsDOMContainers = true;
 export const disableInputAttributeSyncing = false;
 export const disableIEWorkarounds = true;
