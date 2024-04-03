@@ -25,6 +25,7 @@ export const {
   enableComponentStackLocations,
   enableDeferRootSchedulingToMicrotask,
   enableInfiniteRenderLoopDetection,
+  enableObjectFiber,
   enableRenderableContext,
   enableUnifiedSyncLane,
   passChildrenWhenCloningPersistedNodes,
