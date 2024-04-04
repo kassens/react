@@ -85,7 +85,6 @@ export const enableFizzExternalRuntime = true;
 export const enableUseDeferredValueInitialArg = true;
 export const disableClientCache = true;
 
-export const enableServerComponentKeys = true;
 export const enableServerComponentLogs = true;
 
 // TODO: Roll out with GK. Don't keep as dynamic flag for too long, though,

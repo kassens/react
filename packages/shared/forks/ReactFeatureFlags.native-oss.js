@@ -51,7 +51,6 @@ export const enableTaint = __NEXT_RN_MAJOR__;
 export const enableUnifiedSyncLane = __NEXT_RN_MAJOR__;
 export const enableFizzExternalRuntime = __NEXT_RN_MAJOR__; // DOM-only
 export const enableBinaryFlight = __NEXT_RN_MAJOR__; // DOM-only
-export const enableServerComponentKeys = __NEXT_RN_MAJOR__;
 export const enableServerComponentLogs = __NEXT_RN_MAJOR__;
 
 // DEV-only but enabled in the next RN Major.

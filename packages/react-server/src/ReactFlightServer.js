@@ -15,7 +15,6 @@ import {
   enableBinaryFlight,
   enablePostpone,
   enableTaint,
-  enableServerComponentKeys,
   enableRefAsProp,
   enableServerComponentLogs,
 } from 'shared/ReactFeatureFlags';
@@ -681,9 +680,6 @@ function renderFragment(
       }
     }
   }
-  if (!enableServerComponentKeys) {
-    return children;
-  }
   if (task.keyPath !== null) {
     // We have a Server Component that specifies a key but we're now splitting
     // the tree using a fragment.
@@ -724,9 +720,6 @@ function renderClientElement(
   key: null | string,
   props: any,
 ): ReactJSONValue {
-  if (!enableServerComponentKeys) {
-    return [REACT_ELEMENT_TYPE, type, key, props];
-  }
   // We prepend the terminal client element that actually gets serialized with
   // the keys of any Server Components which are not serialized.
   const keyPath = task.keyPath;
@@ -875,7 +868,7 @@ function createTask(
   if (typeof model === 'object' && model !== null) {
     // If we're about to write this into a new task we can assign it an ID early so that
     // any other references can refer to the value we're about to write.
-    if (enableServerComponentKeys && (keyPath !== null || implicitSlot)) {
+    if (keyPath !== null || implicitSlot) {
       // If we're in some kind of context we can't necessarily reuse this object depending
       // what parent components are used.
     } else {
@@ -1320,10 +1313,7 @@ function renderModelDestructive(
         const writtenObjects = request.writtenObjects;
         const existingId = writtenObjects.get(value);
         if (existingId !== undefined) {
-          if (
-            enableServerComponentKeys &&
-            (task.keyPath !== null || task.implicitSlot)
-          ) {
+          if (task.keyPath !== null || task.implicitSlot) {
             // If we're in some kind of context we can't reuse the result of this render or
             // previous renders of this element. We only reuse elements if they're not wrapped
             // by another Server Component.
@@ -1452,10 +1442,7 @@ function renderModelDestructive(
     // $FlowFixMe[method-unbinding]
     if (typeof value.then === 'function') {
       if (existingId !== undefined) {
-        if (
-          enableServerComponentKeys &&
-          (task.keyPath !== null || task.implicitSlot)
-        ) {
+        if (task.keyPath !== null || task.implicitSlot) {
           // If we're in some kind of context we can't reuse the result of this render or
           // previous renders of this element. We only reuse Promises if they're not wrapped
           // by another Server Component.
