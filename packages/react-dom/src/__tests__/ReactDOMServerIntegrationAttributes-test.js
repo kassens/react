@@ -11,7 +11,6 @@
 'use strict';
 
 const ReactDOMServerIntegrationUtils = require('./utils/ReactDOMServerIntegrationTestUtils');
-const ReactFeatureFlags = require('shared/ReactFeatureFlags');
 
 let React;
 let ReactDOM;
