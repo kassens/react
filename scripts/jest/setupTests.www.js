@@ -15,6 +15,12 @@ jest.mock('shared/ReactFeatureFlags', () => {
   // code live.
   actual.disableInputAttributeSyncing = __VARIANT__;
 
+  // These are hardcoded to true for the next release,
+  // but still run the tests against both variants until
+  // we remove the flag.
+  actual.disableIEWorkarounds = __VARIANT__;
+  actual.disableClientCache = __VARIANT__;
+
   return actual;
 });
 

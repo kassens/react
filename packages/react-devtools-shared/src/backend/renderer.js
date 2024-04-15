@@ -86,6 +86,7 @@ import {
   STRICT_MODE_SYMBOL_STRING,
   PROFILER_NUMBER,
   PROFILER_SYMBOL_STRING,
+  REACT_MEMO_CACHE_SENTINEL,
   SCOPE_NUMBER,
   SCOPE_SYMBOL_STRING,
   FORWARD_REF_NUMBER,
@@ -119,6 +120,8 @@ import type {
   RendererInterface,
   SerializedElement,
   WorkTagMap,
+  CurrentDispatcherRef,
+  LegacyDispatcherRef,
 } from './types';
 import type {
   ComponentFilter,
@@ -139,6 +142,31 @@ type ReactPriorityLevelsType = {
   IdlePriority: number,
   NoPriority: number,
 };
+
+export function getDispatcherRef(renderer: {
+  +currentDispatcherRef?: LegacyDispatcherRef | CurrentDispatcherRef,
+  ...
+}): void | CurrentDispatcherRef {
+  if (renderer.currentDispatcherRef === undefined) {
+    return undefined;
+  }
+  const injectedRef = renderer.currentDispatcherRef;
+  if (
+    typeof injectedRef.H === 'undefined' &&
+    typeof injectedRef.current !== 'undefined'
+  ) {
+    // We got a legacy dispatcher injected, let's create a wrapper proxy to translate.
+    return {
+      get H() {
+        return (injectedRef: any).current;
+      },
+      set H(value) {
+        (injectedRef: any).current = value;
+      },
+    };
+  }
+  return (injectedRef: any);
+}
 
 function getFiberFlags(fiber: Fiber): number {
   // The name of this field changed from "effectTag" to "flags"
@@ -447,8 +475,12 @@ export function getInternalReactConstants(version: string): {
     }
 
     let resolvedContext: any = null;
-    // $FlowFixMe[incompatible-type] fiber.updateQueue is mixed
-    if (!shouldSkipForgetCheck && fiber.updateQueue?.memoCache != null) {
+    if (
+      !shouldSkipForgetCheck &&
+      // $FlowFixMe[incompatible-type] fiber.updateQueue is mixed
+      (fiber.updateQueue?.memoCache != null ||
+        fiber.memoizedState?.memoizedState?.[REACT_MEMO_CACHE_SENTINEL])
+    ) {
       const displayNameWithoutForgetWrapper = getDisplayNameForFiber(
         fiber,
         true,
@@ -694,7 +726,7 @@ export function attach(
       getDisplayNameForFiber,
       getIsProfiling: () => isProfiling,
       getLaneLabelMap,
-      currentDispatcherRef: renderer.currentDispatcherRef,
+      currentDispatcherRef: getDispatcherRef(renderer),
       workTagMap: ReactTypeOfWork,
       reactVersion: version,
     });
@@ -3344,10 +3376,7 @@ export function attach(
       }
 
       try {
-        hooks = inspectHooksOfFiber(
-          fiber,
-          (renderer.currentDispatcherRef: any),
-        );
+        hooks = inspectHooksOfFiber(fiber, getDispatcherRef(renderer));
       } finally {
         // Restore original console functionality.
         for (const method in originalConsoleMethods) {
@@ -4571,7 +4600,7 @@ export function attach(
   function getComponentStackForFiber(fiber: Fiber): string | null {
     let componentStack = fiberToComponentStackMap.get(fiber);
     if (componentStack == null) {
-      const dispatcherRef = renderer.currentDispatcherRef;
+      const dispatcherRef = getDispatcherRef(renderer);
       if (dispatcherRef == null) {
         return null;
       }

@@ -97,7 +97,7 @@ describe('ReactDOMFloat', () => {
     });
 
     renderOptions = {};
-    if (gate(flags => flags.enableFizzExternalRuntime)) {
+    if (gate(flags => flags.shouldUseFizzExternalRuntime)) {
       renderOptions.unstable_externalRuntimeSrc =
         'react-dom/unstable_server-external-runtime';
     }
@@ -4261,6 +4261,38 @@ body {
     );
   });
 
+  // Fixes: https://github.com/facebook/react/issues/27910
+  it('omits preloads for images inside noscript tags', async () => {
+    function App() {
+      return (
+        <html>
+          <body>
+            <img src="foo" />
+            <noscript>
+              <img src="bar" />
+            </noscript>
+          </body>
+        </html>
+      );
+    }
+
+    await act(() => {
+      renderToPipeableStream(<App />).pipe(writable);
+    });
+
+    expect(getMeaningfulChildren(document)).toEqual(
+      <html>
+        <head>
+          <link rel="preload" href="foo" as="image" />
+        </head>
+        <body>
+          <img src="foo" />
+          <noscript>&lt;img src="bar"&gt;</noscript>
+        </body>
+      </html>,
+    );
+  });
+
   it('should handle media on image preload', async () => {
     function App({isClient}) {
       ReactDOM.preload('/server', {
@@ -4998,6 +5030,51 @@ body {
         <body>
           <div>primary1</div>
         </body>
+      </html>,
+    );
+  });
+
+  it('should never flush hoistables before the preamble', async () => {
+    let resolve;
+    const promise = new Promise(res => {
+      resolve = res;
+    });
+
+    function App() {
+      ReactDOM.preinit('foo', {as: 'script'});
+      React.use(promise);
+      return (
+        <html>
+          <body>hello</body>
+        </html>
+      );
+    }
+
+    await act(() => {
+      renderToPipeableStream(<App />).pipe(writable);
+    });
+
+    // we assert the default JSDOM still in tact
+    expect(getMeaningfulChildren(document)).toEqual(
+      <html>
+        <head />
+        <body>
+          <div id="container" />
+        </body>
+      </html>,
+    );
+
+    await act(() => {
+      resolve();
+    });
+
+    // we assert the DOM was replaced entirely because we streamed an opening html tag
+    expect(getMeaningfulChildren(document)).toEqual(
+      <html>
+        <head>
+          <script async="" src="foo" />
+        </head>
+        <body>hello</body>
       </html>,
     );
   });

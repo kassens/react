@@ -110,7 +110,7 @@ export const enableUseEffectEventHook = __EXPERIMENTAL__;
 // Test in www before enabling in open source.
 // Enables DOM-server to stream its instruction set as data-attributes
 // (handled with an MutationObserver) instead of inline-scripts
-export const enableFizzExternalRuntime = true;
+export const enableFizzExternalRuntime = __EXPERIMENTAL__;
 
 export const alwaysThrottleRetries = true;
 
@@ -159,7 +159,7 @@ export const disableIEWorkarounds = true;
 export const enableFilterEmptyStringAttributesDOM = true;
 
 // Disabled caching behavior of `react/cache` in client runtimes.
-export const disableClientCache = false;
+export const disableClientCache = true;
 
 // Changes Server Components Reconciliation when they have keys
 export const enableServerComponentKeys = true;

@@ -27,15 +27,13 @@ import {checkPropStringCoercion} from 'shared/CheckStringCoercion';
 import {ClassComponent} from 'react-reconciler/src/ReactWorkTags';
 import getComponentNameFromFiber from 'react-reconciler/src/getComponentNameFromFiber';
 
-const ReactCurrentOwner = ReactSharedInternals.ReactCurrentOwner;
-const ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
-
 const REACT_CLIENT_REFERENCE = Symbol.for('react.client.reference');
 
 let specialPropKeyWarningShown;
 let specialPropRefWarningShown;
 let didWarnAboutStringRefs;
 let didWarnAboutElementRef;
+let didWarnAboutOldJSXRuntime;
 
 if (__DEV__) {
   didWarnAboutStringRefs = {};
@@ -71,12 +69,12 @@ function warnIfStringRefCannotBeAutoConverted(config, self) {
     if (
       !disableStringRefs &&
       typeof config.ref === 'string' &&
-      ReactCurrentOwner.current &&
+      ReactSharedInternals.owner &&
       self &&
-      ReactCurrentOwner.current.stateNode !== self
+      ReactSharedInternals.owner.stateNode !== self
     ) {
       const componentName = getComponentNameFromType(
-        ReactCurrentOwner.current.type,
+        ReactSharedInternals.owner.type,
       );
 
       if (!didWarnAboutStringRefs[componentName]) {
@@ -87,7 +85,7 @@ function warnIfStringRefCannotBeAutoConverted(config, self) {
             'We ask you to manually fix this case by using useRef() or createRef() instead. ' +
             'Learn more about using refs safely here: ' +
             'https://react.dev/link/strict-mode-string-ref',
-          getComponentNameFromType(ReactCurrentOwner.current.type),
+          getComponentNameFromType(ReactSharedInternals.owner.type),
           config.ref,
         );
         didWarnAboutStringRefs[componentName] = true;
@@ -341,7 +339,7 @@ export function jsxProd(type, config, maybeKey) {
     if (!enableRefAsProp) {
       ref = config.ref;
       if (!disableStringRefs) {
-        ref = coerceStringRef(ref, ReactCurrentOwner.current, type);
+        ref = coerceStringRef(ref, ReactSharedInternals.owner, type);
       }
     }
   }
@@ -364,16 +362,12 @@ export function jsxProd(type, config, maybeKey) {
     // because in V8 it will deopt the object to dictionary mode.
     props = {};
     for (const propName in config) {
-      if (
-        hasOwnProperty.call(config, propName) &&
-        // Skip over reserved prop names
-        propName !== 'key' &&
-        (enableRefAsProp || propName !== 'ref')
-      ) {
+      // Skip over reserved prop names
+      if (propName !== 'key' && (enableRefAsProp || propName !== 'ref')) {
         if (enableRefAsProp && !disableStringRefs && propName === 'ref') {
           props.ref = coerceStringRef(
             config[propName],
-            ReactCurrentOwner.current,
+            ReactSharedInternals.owner,
             type,
           );
         } else {
@@ -401,7 +395,7 @@ export function jsxProd(type, config, maybeKey) {
     ref,
     undefined,
     undefined,
-    ReactCurrentOwner.current,
+    ReactSharedInternals.owner,
     props,
   );
 }
@@ -577,7 +571,7 @@ export function jsxDEV(type, config, maybeKey, isStaticChildren, source, self) {
       if (!enableRefAsProp) {
         ref = config.ref;
         if (!disableStringRefs) {
-          ref = coerceStringRef(ref, ReactCurrentOwner.current, type);
+          ref = coerceStringRef(ref, ReactSharedInternals.owner, type);
         }
       }
       if (!disableStringRefs) {
@@ -603,16 +597,12 @@ export function jsxDEV(type, config, maybeKey, isStaticChildren, source, self) {
       // because in V8 it will deopt the object to dictionary mode.
       props = {};
       for (const propName in config) {
-        if (
-          hasOwnProperty.call(config, propName) &&
-          // Skip over reserved prop names
-          propName !== 'key' &&
-          (enableRefAsProp || propName !== 'ref')
-        ) {
+        // Skip over reserved prop names
+        if (propName !== 'key' && (enableRefAsProp || propName !== 'ref')) {
           if (enableRefAsProp && !disableStringRefs && propName === 'ref') {
             props.ref = coerceStringRef(
               config[propName],
-              ReactCurrentOwner.current,
+              ReactSharedInternals.owner,
               type,
             );
           } else {
@@ -653,7 +643,7 @@ export function jsxDEV(type, config, maybeKey, isStaticChildren, source, self) {
       ref,
       self,
       source,
-      ReactCurrentOwner.current,
+      ReactSharedInternals.owner,
       props,
     );
 
@@ -733,11 +723,33 @@ export function createElement(type, config, children) {
   let ref = null;
 
   if (config != null) {
+    if (__DEV__) {
+      if (
+        !didWarnAboutOldJSXRuntime &&
+        '__self' in config &&
+        // Do not assume this is the result of an oudated JSX transform if key
+        // is present, because the modern JSX transform sometimes outputs
+        // createElement to preserve precedence between a static key and a
+        // spread key. To avoid false positive warnings, we never warn if
+        // there's a key.
+        !('key' in config)
+      ) {
+        didWarnAboutOldJSXRuntime = true;
+        console.warn(
+          'Your app (or one of its dependencies) is using an outdated JSX ' +
+            'transform. Update to the modern JSX transform for ' +
+            'faster performance: ' +
+            // TODO: Create a short link for this
+            'https://reactjs.org/blog/2020/09/22/introducing-the-new-jsx-transform.html',
+        );
+      }
+    }
+
     if (hasValidRef(config)) {
       if (!enableRefAsProp) {
         ref = config.ref;
         if (!disableStringRefs) {
-          ref = coerceStringRef(ref, ReactCurrentOwner.current, type);
+          ref = coerceStringRef(ref, ReactSharedInternals.owner, type);
         }
       }
 
@@ -769,7 +781,7 @@ export function createElement(type, config, children) {
         if (enableRefAsProp && !disableStringRefs && propName === 'ref') {
           props.ref = coerceStringRef(
             config[propName],
-            ReactCurrentOwner.current,
+            ReactSharedInternals.owner,
             type,
           );
         } else {
@@ -827,7 +839,7 @@ export function createElement(type, config, children) {
     ref,
     undefined,
     undefined,
-    ReactCurrentOwner.current,
+    ReactSharedInternals.owner,
     props,
   );
 
@@ -877,6 +889,7 @@ export function cloneElement(element, config, children) {
 
   if (config != null) {
     if (hasValidRef(config)) {
+      owner = ReactSharedInternals.owner;
       if (!enableRefAsProp) {
         // Silently steal the ref from the parent.
         ref = config.ref;
@@ -884,7 +897,6 @@ export function cloneElement(element, config, children) {
           ref = coerceStringRef(ref, owner, element.type);
         }
       }
-      owner = ReactCurrentOwner.current;
     }
     if (hasValidKey(config)) {
       if (__DEV__) {
@@ -971,8 +983,8 @@ export function cloneElement(element, config, children) {
 
 function getDeclarationErrorAddendum() {
   if (__DEV__) {
-    if (ReactCurrentOwner.current) {
-      const name = getComponentNameFromType(ReactCurrentOwner.current.type);
+    if (ReactSharedInternals.owner) {
+      const name = getComponentNameFromType(ReactSharedInternals.owner.type);
       if (name) {
         return '\n\nCheck the render method of `' + name + '`.';
       }
@@ -1076,7 +1088,7 @@ function validateExplicitKey(element, parentType) {
     if (
       element &&
       element._owner != null &&
-      element._owner !== ReactCurrentOwner.current
+      element._owner !== ReactSharedInternals.owner
     ) {
       let ownerName = null;
       if (typeof element._owner.tag === 'number') {
@@ -1107,9 +1119,9 @@ function setCurrentlyValidatingElement(element) {
         element.type,
         owner ? owner.type : null,
       );
-      ReactDebugCurrentFrame.setExtraStackFrame(stack);
+      ReactSharedInternals.setExtraStackFrame(stack);
     } else {
-      ReactDebugCurrentFrame.setExtraStackFrame(null);
+      ReactSharedInternals.setExtraStackFrame(null);
     }
   }
 }
@@ -1177,7 +1189,15 @@ function coerceStringRef(mixedRef, owner, type) {
     }
   }
 
-  return stringRefAsCallbackRef.bind(null, stringRef, type, owner);
+  const callback = stringRefAsCallbackRef.bind(null, stringRef, type, owner);
+  // This is used to check whether two callback refs conceptually represent
+  // the same string ref, and can therefore be reused by the reconciler. Needed
+  // for backwards compatibility with old Meta code that relies on string refs
+  // not being reattached on every render.
+  callback.__stringRef = stringRef;
+  callback.__type = type;
+  callback.__owner = owner;
+  return callback;
 }
 
 function stringRefAsCallbackRef(stringRef, type, owner, value) {

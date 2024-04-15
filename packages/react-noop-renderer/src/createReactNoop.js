@@ -21,12 +21,15 @@ import type {
 import type {UpdateQueue} from 'react-reconciler/src/ReactFiberClassUpdateQueue';
 import type {ReactNodeList} from 'shared/ReactTypes';
 import type {RootTag} from 'react-reconciler/src/ReactRootTags';
+import type {EventPriority} from 'react-reconciler/src/ReactEventPriorities';
 
 import * as Scheduler from 'scheduler/unstable_mock';
 import {REACT_FRAGMENT_TYPE, REACT_ELEMENT_TYPE} from 'shared/ReactSymbols';
 import isArray from 'shared/isArray';
 import {checkPropStringCoercion} from 'shared/CheckStringCoercion';
 import {
+  NoEventPriority,
+  DiscreteEventPriority,
   DefaultEventPriority,
   IdleEventPriority,
   ConcurrentRoot,
@@ -37,6 +40,8 @@ import {
   disableLegacyMode,
   disableStringRefs,
 } from 'shared/ReactFeatureFlags';
+
+import ReactSharedInternals from 'shared/ReactSharedInternals';
 
 type Container = {
   rootID: string,
@@ -84,6 +89,8 @@ type SuspenseyCommitSubscription = {
 };
 
 export type TransitionStatus = mixed;
+
+export type FormInstance = Instance;
 
 const NO_CONTEXT = {};
 const UPPERCASE_CONTEXT = {};
@@ -512,7 +519,13 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
 
     resetAfterCommit(): void {},
 
-    getCurrentEventPriority() {
+    setCurrentUpdatePriority,
+    getCurrentUpdatePriority,
+
+    resolveUpdatePriority() {
+      if (currentUpdatePriority !== NoEventPriority) {
+        return currentUpdatePriority;
+      }
       return currentEventPriority;
     },
 
@@ -621,6 +634,8 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
     waitForCommitToBeReady,
 
     NotPendingTransition: (null: TransitionStatus),
+
+    resetFormInstance(form: Instance) {},
   };
 
   const hostConfig = useMutation
@@ -786,6 +801,15 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
   const roots = new Map();
   const DEFAULT_ROOT_ID = '<default>';
 
+  let currentUpdatePriority = NoEventPriority;
+  function setCurrentUpdatePriority(newPriority: EventPriority): void {
+    currentUpdatePriority = newPriority;
+  }
+
+  function getCurrentUpdatePriority(): EventPriority {
+    return currentUpdatePriority;
+  }
+
   let currentEventPriority = DefaultEventPriority;
 
   function createJSXElementForTestComparison(type, props) {
@@ -926,7 +950,25 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
         );
       }
     }
-    return NoopRenderer.flushSync(fn);
+    if (disableLegacyMode) {
+      const previousTransition = ReactSharedInternals.T;
+      const preivousEventPriority = currentEventPriority;
+      try {
+        ReactSharedInternals.T = null;
+        currentEventPriority = DiscreteEventPriority;
+        if (fn) {
+          return fn();
+        } else {
+          return undefined;
+        }
+      } finally {
+        ReactSharedInternals.T = previousTransition;
+        currentEventPriority = preivousEventPriority;
+        NoopRenderer.flushSyncWork();
+      }
+    } else {
+      return NoopRenderer.flushSyncFromReconciler(fn);
+    }
   }
 
   function onRecoverableError(error) {
@@ -1064,6 +1106,7 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
         getChildrenAsJSX() {
           return getChildrenAsJSX(container);
         },
+        legacy: true,
       };
     },
 
@@ -1223,7 +1266,18 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
       return Scheduler.unstable_flushExpired();
     },
 
-    unstable_runWithPriority: NoopRenderer.runWithPriority,
+    unstable_runWithPriority: function runWithPriority<T>(
+      priority: EventPriority,
+      fn: () => T,
+    ): T {
+      const previousPriority = getCurrentUpdatePriority();
+      try {
+        setCurrentUpdatePriority(priority);
+        return fn();
+      } finally {
+        setCurrentUpdatePriority(previousPriority);
+      }
+    },
 
     batchedUpdates: NoopRenderer.batchedUpdates,
 

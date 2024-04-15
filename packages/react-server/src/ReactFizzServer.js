@@ -152,10 +152,6 @@ import isArray from 'shared/isArray';
 import {SuspenseException, getSuspendedThenable} from './ReactFizzThenable';
 import type {Postpone} from 'react/src/ReactPostpone';
 
-const ReactCurrentDispatcher = ReactSharedInternals.ReactCurrentDispatcher;
-const ReactCurrentCache = ReactSharedInternals.ReactCurrentCache;
-const ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
-
 // Linked list representing the identity of a component given the component/tag name and key.
 // The name might be minified but we assume that it's going to be the same generated name. Typically
 // because it's just the same compiled output in practice.
@@ -3665,21 +3661,21 @@ export function performWork(request: Request): void {
     return;
   }
   const prevContext = getActiveContext();
-  const prevDispatcher = ReactCurrentDispatcher.current;
-  ReactCurrentDispatcher.current = HooksDispatcher;
-  let prevCacheDispatcher;
+  const prevDispatcher = ReactSharedInternals.H;
+  ReactSharedInternals.H = HooksDispatcher;
+  let prevCacheDispatcher = null;
   if (enableCache) {
-    prevCacheDispatcher = ReactCurrentCache.current;
-    ReactCurrentCache.current = DefaultCacheDispatcher;
+    prevCacheDispatcher = ReactSharedInternals.C;
+    ReactSharedInternals.C = DefaultCacheDispatcher;
   }
 
   const prevRequest = currentRequest;
   currentRequest = request;
 
-  let prevGetCurrentStackImpl;
+  let prevGetCurrentStackImpl = null;
   if (__DEV__) {
-    prevGetCurrentStackImpl = ReactDebugCurrentFrame.getCurrentStack;
-    ReactDebugCurrentFrame.getCurrentStack = getCurrentStackInDEV;
+    prevGetCurrentStackImpl = ReactSharedInternals.getCurrentStack;
+    ReactSharedInternals.getCurrentStack = getCurrentStackInDEV;
   }
   const prevResumableState = currentResumableState;
   setCurrentResumableState(request.resumableState);
@@ -3700,13 +3696,13 @@ export function performWork(request: Request): void {
     fatalError(request, error);
   } finally {
     setCurrentResumableState(prevResumableState);
-    ReactCurrentDispatcher.current = prevDispatcher;
+    ReactSharedInternals.H = prevDispatcher;
     if (enableCache) {
-      ReactCurrentCache.current = prevCacheDispatcher;
+      ReactSharedInternals.C = prevCacheDispatcher;
     }
 
     if (__DEV__) {
-      ReactDebugCurrentFrame.getCurrentStack = prevGetCurrentStackImpl;
+      ReactSharedInternals.getCurrentStack = prevGetCurrentStackImpl;
     }
     if (prevDispatcher === HooksDispatcher) {
       // This means that we were in a reentrant work loop. This could happen
@@ -4061,22 +4057,25 @@ function flushCompletedQueues(
     // that item fully and then yield. At that point we remove the already completed
     // items up until the point we completed them.
 
+    if (request.pendingRootTasks > 0) {
+      // When there are pending root tasks we don't want to flush anything
+      return;
+    }
+
     let i;
     const completedRootSegment = request.completedRootSegment;
     if (completedRootSegment !== null) {
       if (completedRootSegment.status === POSTPONED) {
         // We postponed the root, so we write nothing.
         return;
-      } else if (request.pendingRootTasks === 0) {
-        flushPreamble(request, destination, completedRootSegment);
-        flushSegment(request, destination, completedRootSegment, null);
-        request.completedRootSegment = null;
-        writeCompletedRoot(destination, request.renderState);
-      } else {
-        // We haven't flushed the root yet so we don't need to check any other branches further down
-        return;
       }
+
+      flushPreamble(request, destination, completedRootSegment);
+      flushSegment(request, destination, completedRootSegment, null);
+      request.completedRootSegment = null;
+      writeCompletedRoot(destination, request.renderState);
     }
+
     writeHoistables(destination, request.resumableState, request.renderState);
     // We emit client rendering instructions for already emitted boundaries first.
     // This is so that we can signal to the client to start client rendering them as

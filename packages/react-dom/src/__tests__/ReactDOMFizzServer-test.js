@@ -104,7 +104,7 @@ describe('ReactDOMFizzServer', () => {
       console.error = (error, ...args) => {
         if (
           typeof error !== 'string' ||
-          error.indexOf('ReactDOM.useFormState has been deprecated') === -1
+          error.indexOf('ReactDOM.useFormState has been renamed') === -1
         ) {
           originalConsoleError(error, ...args);
         }
@@ -153,7 +153,7 @@ describe('ReactDOMFizzServer', () => {
     });
 
     renderOptions = {};
-    if (gate(flags => flags.enableFizzExternalRuntime)) {
+    if (gate(flags => flags.shouldUseFizzExternalRuntime)) {
       renderOptions.unstable_externalRuntimeSrc =
         'react-dom-bindings/src/server/ReactDOMServerExternalRuntime.js';
     }
@@ -610,7 +610,7 @@ describe('ReactDOMFizzServer', () => {
         Array.from(container.getElementsByTagName('script')).filter(
           node => node.getAttribute('nonce') === CSPnonce,
         ).length,
-      ).toEqual(6);
+      ).toEqual(gate(flags => flags.shouldUseFizzExternalRuntime) ? 6 : 5);
 
       await act(() => {
         resolve({default: Text});
@@ -4292,7 +4292,7 @@ describe('ReactDOMFizzServer', () => {
     );
   });
 
-  // @gate enableFizzExternalRuntime
+  // @gate shouldUseFizzExternalRuntime
   it('does not send script tags for SSR instructions when using the external runtime', async () => {
     function App() {
       return (
@@ -6926,7 +6926,14 @@ describe('ReactDOMFizzServer', () => {
     expect(getVisibleChildren(container)).toEqual(
       <div>
         {'Loading1'}
-        {'Hello'}
+        {/*
+          This used to show "Hello" in this slot because the boundary was able to be flushed
+          early but we now prevent flushing while pendingRootTasks is not zero. This is how Edge
+          would work anyway because you don't get the stream until the root is unblocked on a resume
+          so Node now aligns with edge bevavior
+          {'Hello'}
+        */}
+        {'Loading2'}
         {'Loading3'}
       </div>,
     );

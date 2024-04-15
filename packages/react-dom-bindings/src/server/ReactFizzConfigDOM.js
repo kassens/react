@@ -83,18 +83,19 @@ import {getValueDescriptorExpectingObjectForWarning} from '../shared/ReactDOMRes
 import {NotPending} from '../shared/ReactDOMFormActions';
 
 import ReactDOMSharedInternals from 'shared/ReactDOMSharedInternals';
-const ReactDOMCurrentDispatcher =
-  ReactDOMSharedInternals.ReactDOMCurrentDispatcher;
 
-const previousDispatcher = ReactDOMCurrentDispatcher.current;
-ReactDOMCurrentDispatcher.current = {
-  prefetchDNS,
-  preconnect,
-  preload,
-  preloadModule,
-  preinitScript,
-  preinitStyle,
-  preinitModuleScript,
+const previousDispatcher =
+  ReactDOMSharedInternals.d; /* ReactDOMCurrentDispatcher */
+ReactDOMSharedInternals.d /* ReactDOMCurrentDispatcher */ = {
+  f /* flushSyncWork */: previousDispatcher.f /* flushSyncWork */,
+  r /* requestFormReset */: previousDispatcher.r /* requestFormReset */,
+  D /* prefetchDNS */: prefetchDNS,
+  C /* preconnect */: preconnect,
+  L /* preload */: preload,
+  m /* preloadModule */: preloadModule,
+  X /* preinitScript */: preinitScript,
+  S /* preinitStyle */: preinitStyle,
+  M /* preinitModuleScript */: preinitModuleScript,
 };
 
 // We make every property of the descriptor optional because it is not a contract that
@@ -2762,7 +2763,7 @@ function pushImg(
   props: Object,
   resumableState: ResumableState,
   renderState: RenderState,
-  pictureTagInScope: boolean,
+  pictureOrNoScriptTagInScope: boolean,
 ): null {
   const {src, srcSet} = props;
   if (
@@ -2771,7 +2772,7 @@ function pushImg(
     (typeof src === 'string' || src == null) &&
     (typeof srcSet === 'string' || srcSet == null) &&
     props.fetchPriority !== 'low' &&
-    pictureTagInScope === false &&
+    pictureOrNoScriptTagInScope === false &&
     // We exclude data URIs in src and srcSet since these should not be preloaded
     !(
       typeof src === 'string' &&
@@ -3599,7 +3600,7 @@ export function pushStartInstance(
         props,
         resumableState,
         renderState,
-        !!(formatContext.tagScope & PICTURE_SCOPE),
+        !!(formatContext.tagScope & (PICTURE_SCOPE | NOSCRIPT_SCOPE)),
       );
     }
     // Omitted close tags
@@ -5266,7 +5267,7 @@ function prefetchDNS(href: string) {
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
-    previousDispatcher.prefetchDNS(href);
+    previousDispatcher.D(/* prefetchDNS */ href);
     return;
   }
   const resumableState = getResumableState(request);
@@ -5319,7 +5320,7 @@ function preconnect(href: string, crossOrigin: ?CrossOriginEnum) {
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
-    previousDispatcher.preconnect(href, crossOrigin);
+    previousDispatcher.C(/* preconnect */ href, crossOrigin);
     return;
   }
   const resumableState = getResumableState(request);
@@ -5380,7 +5381,7 @@ function preload(href: string, as: string, options?: ?PreloadImplOptions) {
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
-    previousDispatcher.preload(href, as, options);
+    previousDispatcher.L(/* preload */ href, as, options);
     return;
   }
   const resumableState = getResumableState(request);
@@ -5581,7 +5582,7 @@ function preloadModule(
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
-    previousDispatcher.preloadModule(href, options);
+    previousDispatcher.m(/* preloadModule */ href, options);
     return;
   }
   const resumableState = getResumableState(request);
@@ -5655,7 +5656,7 @@ function preinitStyle(
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
-    previousDispatcher.preinitStyle(href, precedence, options);
+    previousDispatcher.S(/* preinitStyle */ href, precedence, options);
     return;
   }
   const resumableState = getResumableState(request);
@@ -5740,7 +5741,7 @@ function preinitScript(src: string, options?: ?PreinitScriptOptions): void {
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
-    previousDispatcher.preinitScript(src, options);
+    previousDispatcher.X(/* preinitScript */ src, options);
     return;
   }
   const resumableState = getResumableState(request);
@@ -5803,7 +5804,7 @@ function preinitModuleScript(
     // the resources for this call in either case we opt to do nothing. We can consider making this a warning
     // but there may be times where calling a function outside of render is intentional (i.e. to warm up data
     // fetching) and we don't want to warn in those cases.
-    previousDispatcher.preinitModuleScript(src, options);
+    previousDispatcher.M(/* preinitModuleScript */ src, options);
     return;
   }
   const resumableState = getResumableState(request);

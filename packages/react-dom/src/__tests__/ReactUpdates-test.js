@@ -25,7 +25,8 @@ describe('ReactUpdates', () => {
     React = require('react');
     ReactDOM = require('react-dom');
     findDOMNode =
-      ReactDOM.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.findDOMNode;
+      ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE
+        .findDOMNode;
     ReactDOMClient = require('react-dom/client');
     act = require('internal-test-utils').act;
     Scheduler = require('scheduler');
@@ -1899,6 +1900,8 @@ describe('ReactUpdates', () => {
       await act(() => {
         root.render(<Terminating />);
       });
+
+      assertLog(Array.from({length: LIMIT + 1}, (_, k) => k));
       expect(container.textContent).toBe('50');
       await act(() => {
         _setStep(0);
