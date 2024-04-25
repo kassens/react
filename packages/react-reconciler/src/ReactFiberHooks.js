@@ -2564,9 +2564,13 @@ function imperativeHandleEffect<T>(
   if (typeof ref === 'function') {
     const refCallback = ref;
     const inst = create();
-    refCallback(inst);
+    const refCleanup = refCallback(inst);
     return () => {
-      refCallback(null);
+      if (typeof refCleanup === 'function') {
+        refCleanup();
+      } else {
+        refCallback(null);
+      }
     };
   } else if (ref !== null && ref !== undefined) {
     const refObject = ref;
