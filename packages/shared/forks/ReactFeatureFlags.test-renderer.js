@@ -20,9 +20,9 @@ export const enableProfilerNestedUpdatePhase = __PROFILE__;
 export const enableUpdaterTracking = false;
 export const enableCache = true;
 export const enableLegacyCache = __EXPERIMENTAL__;
-export const enableFetchInstrumentation = true;
 export const enableBinaryFlight = true;
 export const enableFlightReadableStream = true;
+export const enableAsyncIterableChildren = false;
 export const enableTaint = true;
 export const enablePostpone = false;
 export const disableCommentsAsDOMContainers = true;
@@ -37,6 +37,7 @@ export const enableSuspenseAvoidThisFallback = false;
 export const enableSuspenseAvoidThisFallbackFizz = false;
 export const enableCPUSuspense = false;
 export const enableUseMemoCacheHook = true;
+export const enableNoCloningMemoCache = false;
 export const enableUseEffectEventHook = false;
 export const favorSafetyOverHydrationPerf = true;
 export const enableComponentStackLocations = true;
@@ -77,6 +78,8 @@ export const enableServerComponentKeys = true;
 export const enableServerComponentLogs = true;
 export const enableInfiniteRenderLoopDetection = false;
 export const enableEarlyReturnForPropDiffing = false;
+
+export const renameElementSymbol = true;
 
 // TODO: This must be in sync with the main ReactFeatureFlags file because
 // the Test Renderer's value must be the same as the one used by the

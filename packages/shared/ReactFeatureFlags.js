@@ -78,10 +78,10 @@ export const enableLegacyFBSupport = false;
 
 export const enableCache = true;
 export const enableLegacyCache = __EXPERIMENTAL__;
-export const enableFetchInstrumentation = true;
 
 export const enableBinaryFlight = __EXPERIMENTAL__;
 export const enableFlightReadableStream = __EXPERIMENTAL__;
+export const enableAsyncIterableChildren = __EXPERIMENTAL__;
 
 export const enableTaint = __EXPERIMENTAL__;
 
@@ -105,6 +105,8 @@ export const enableCPUSuspense = __EXPERIMENTAL__;
 // Enables unstable_useMemoCache hook, intended as a compilation target for
 // auto-memoization.
 export const enableUseMemoCacheHook = __EXPERIMENTAL__;
+// Test this at Meta before enabling.
+export const enableNoCloningMemoCache = false;
 
 export const enableUseEffectEventHook = __EXPERIMENTAL__;
 
@@ -140,6 +142,9 @@ export const transitionLaneExpirationMs = 5000;
 // different section of this file.
 
 // const __NEXT_MAJOR__ = __EXPERIMENTAL__;
+
+// Renames the internal symbol for elements since they have changed signature/constructor
+export const renameElementSymbol = true;
 
 // Removes legacy style context
 export const disableLegacyContext = true;

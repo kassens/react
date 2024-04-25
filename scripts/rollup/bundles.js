@@ -151,16 +151,40 @@ const bundles = [
 
   /******* React DOM *******/
   {
-    bundleTypes: [
-      NODE_DEV,
-      NODE_PROD,
-      NODE_PROFILING,
-      FB_WWW_DEV,
-      FB_WWW_PROD,
-      FB_WWW_PROFILING,
-    ],
+    bundleTypes: [NODE_DEV, NODE_PROD],
     moduleType: RENDERER,
     entry: 'react-dom',
+    global: 'ReactDOM',
+    minifyWithProdErrorCodes: true,
+    wrapWithModuleBoundaries: true,
+    externals: ['react'],
+  },
+  /******* React DOM Client *******/
+  {
+    bundleTypes: [NODE_DEV, NODE_PROD],
+    moduleType: RENDERER,
+    entry: 'react-dom/client',
+    global: 'ReactDOM',
+    minifyWithProdErrorCodes: true,
+    wrapWithModuleBoundaries: true,
+    externals: ['react', 'react-dom'],
+  },
+
+  /******* React DOM Profiling (Client) *******/
+  {
+    bundleTypes: [NODE_DEV, NODE_PROFILING],
+    moduleType: RENDERER,
+    entry: 'react-dom/profiling',
+    global: 'ReactDOM',
+    minifyWithProdErrorCodes: true,
+    wrapWithModuleBoundaries: true,
+    externals: ['react', 'react-dom'],
+  },
+  /******* React DOM FB *******/
+  {
+    bundleTypes: [FB_WWW_DEV, FB_WWW_PROD, FB_WWW_PROFILING],
+    moduleType: RENDERER,
+    entry: 'react-dom/src/ReactDOMFB.js',
     global: 'ReactDOM',
     minifyWithProdErrorCodes: true,
     wrapWithModuleBoundaries: true,
@@ -171,7 +195,7 @@ const bundles = [
   {
     bundleTypes: [NODE_DEV, NODE_PROD],
     moduleType: RENDERER,
-    entry: 'react-dom/src/ReactDOMServer.js',
+    entry: 'react-dom/src/ReactDOMReactServer.js',
     name: 'react-dom.react-server',
     condition: 'react-server',
     global: 'ReactDOM',
@@ -191,13 +215,22 @@ const bundles = [
     externals: ['react', 'react-dom'],
   },
 
+  /******* React DOM - Testing *******/
+  {
+    moduleType: RENDERER,
+    bundleTypes: __EXPERIMENTAL__ ? [NODE_DEV, NODE_PROD] : [],
+    entry: 'react-dom/unstable_testing',
+    global: 'ReactDOMTesting',
+    minifyWithProdErrorCodes: true,
+    wrapWithModuleBoundaries: false,
+    externals: ['react', 'react-dom'],
+  },
+
   /******* React DOM - www - Testing *******/
   {
     moduleType: RENDERER,
-    bundleTypes: __EXPERIMENTAL__
-      ? [FB_WWW_DEV, FB_WWW_PROD, NODE_DEV, NODE_PROD]
-      : [FB_WWW_DEV, FB_WWW_PROD],
-    entry: 'react-dom/unstable_testing',
+    bundleTypes: [FB_WWW_DEV, FB_WWW_PROD],
+    entry: 'react-dom/src/ReactDOMTestingFB.js',
     global: 'ReactDOMTesting',
     minifyWithProdErrorCodes: true,
     wrapWithModuleBoundaries: false,
@@ -304,18 +337,6 @@ const bundles = [
     minifyWithProdErrorCodes: false,
     wrapWithModuleBoundaries: false,
     externals: [],
-  },
-
-  /******* React DOM Server Render Stub *******/
-  {
-    bundleTypes: [NODE_DEV, NODE_PROD],
-    moduleType: RENDERER,
-    entry: 'react-dom/server-rendering-stub',
-    name: 'react-dom-server-rendering-stub',
-    global: 'ReactDOMServerRenderingStub',
-    minifyWithProdErrorCodes: true,
-    wrapWithModuleBoundaries: false,
-    externals: ['react'],
   },
 
   /******* React Server DOM Webpack Server *******/
@@ -782,7 +803,7 @@ const bundles = [
 
   /******* React Reconciler *******/
   {
-    bundleTypes: [NODE_DEV, NODE_PROD, NODE_PROFILING],
+    bundleTypes: [NODE_DEV, NODE_PROD, NODE_PROFILING, FB_WWW_DEV, FB_WWW_PROD],
     moduleType: RECONCILER,
     entry: 'react-reconciler',
     global: 'ReactReconciler',
@@ -1098,17 +1119,17 @@ function getFilename(bundle, bundleType) {
     case BUN_DEV:
       return `${name}.development.js`;
     case BUN_PROD:
-      return `${name}.production.min.js`;
+      return `${name}.production.js`;
     case ESM_DEV:
       return `${name}.development.js`;
     case ESM_PROD:
-      return `${name}.production.min.js`;
+      return `${name}.production.js`;
     case NODE_DEV:
       return `${name}.development.js`;
     case NODE_PROD:
-      return `${name}.production.min.js`;
+      return `${name}.production.js`;
     case NODE_PROFILING:
-      return `${name}.profiling.min.js`;
+      return `${name}.profiling.js`;
     case FB_WWW_DEV:
     case RN_OSS_DEV:
     case RN_FB_DEV:

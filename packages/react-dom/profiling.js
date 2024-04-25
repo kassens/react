@@ -7,4 +7,6 @@
  * @flow
  */
 
-export {renderToReadableStream, version} from './ReactDOMFizzServerBun.js';
+// This entrypoint should track the /client entrypoint
+export * from './client';
+export * from './index';

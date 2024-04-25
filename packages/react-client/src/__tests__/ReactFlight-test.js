@@ -277,6 +277,51 @@ describe('ReactFlight', () => {
     expect(ReactNoop).toMatchRenderedOutput(<span>ABC</span>);
   });
 
+  it('can render an iterator as a single shot iterator', async () => {
+    const iterator = (function* () {
+      yield 'A';
+      yield 'B';
+      yield 'C';
+    })();
+
+    const transport = ReactNoopFlightServer.render(iterator);
+    const result = await ReactNoopFlightClient.read(transport);
+
+    // The iterator should be the same as itself.
+    expect(result[Symbol.iterator]()).toBe(result);
+
+    expect(Array.from(result)).toEqual(['A', 'B', 'C']);
+    // We've already consumed this iterator.
+    expect(Array.from(result)).toEqual([]);
+  });
+
+  it('can render a Generator Server Component as a fragment', async () => {
+    function ItemListClient(props) {
+      return <span>{props.children}</span>;
+    }
+    const ItemList = clientReference(ItemListClient);
+
+    function* Items() {
+      yield 'A';
+      yield 'B';
+      yield 'C';
+    }
+
+    const model = (
+      <ItemList>
+        <Items />
+      </ItemList>
+    );
+
+    const transport = ReactNoopFlightServer.render(model);
+
+    await act(async () => {
+      ReactNoop.render(await ReactNoopFlightClient.read(transport));
+    });
+
+    expect(ReactNoop).toMatchRenderedOutput(<span>ABC</span>);
+  });
+
   it('can render undefined', async () => {
     function Undefined() {
       return undefined;
@@ -2125,7 +2170,7 @@ describe('ReactFlight', () => {
     );
   });
 
-  // @gate enableFlightReadableStream
+  // @gate enableFlightReadableStream && enableAsyncIterableChildren
   it('shares state when moving keyed Server Components that render async iterables', async () => {
     function StatefulClient({name, initial}) {
       const [state] = React.useState(initial);
@@ -2133,46 +2178,16 @@ describe('ReactFlight', () => {
     }
     const Stateful = clientReference(StatefulClient);
 
-    function ServerComponent({item, initial}) {
-      // While the ServerComponent itself could be an async generator, single-shot iterables
-      // are not supported as React children since React might need to re-map them based on
-      // state updates. So we create an AsyncIterable instead.
-      return {
-        async *[Symbol.asyncIterator]() {
-          yield <Stateful key="a" initial={'a' + initial} />;
-          yield <Stateful key="b" initial={'b' + initial} />;
-        },
-      };
+    async function* ServerComponent({item, initial}) {
+      yield <Stateful key="a" initial={'a' + initial} />;
+      yield <Stateful key="b" initial={'b' + initial} />;
     }
-
-    function ListClient({children}) {
-      // TODO: Unwrap AsyncIterables natively in React. For now we do it in this wrapper.
-      const resolvedChildren = [];
-      // eslint-disable-next-line no-for-of-loops/no-for-of-loops
-      for (const fragment of children) {
-        // We should've wrapped each child in a keyed Fragment.
-        expect(fragment.type).toBe(React.Fragment);
-        const fragmentChildren = [];
-        const iterator = fragment.props.children[Symbol.asyncIterator]();
-        for (let entry; !(entry = React.use(iterator.next())).done; ) {
-          fragmentChildren.push(entry.value);
-        }
-        resolvedChildren.push(
-          <React.Fragment key={fragment.key}>
-            {fragmentChildren}
-          </React.Fragment>,
-        );
-      }
-      return <div>{resolvedChildren}</div>;
-    }
-
-    const List = clientReference(ListClient);
 
     const transport = ReactNoopFlightServer.render(
-      <List>
+      <div>
         <ServerComponent key="A" initial={1} />
         <ServerComponent key="B" initial={2} />
-      </List>,
+      </div>,
     );
 
     await act(async () => {
@@ -2191,10 +2206,10 @@ describe('ReactFlight', () => {
     // We swap the Server Components and the state of each child inside each fragment should move.
     // Really the Fragment itself moves.
     const transport2 = ReactNoopFlightServer.render(
-      <List>
+      <div>
         <ServerComponent key="B" initial={4} />
         <ServerComponent key="A" initial={3} />
-      </List>,
+      </div>,
     );
 
     await act(async () => {
@@ -2293,35 +2308,16 @@ describe('ReactFlight', () => {
     );
   });
 
-  // @gate enableFlightReadableStream
+  // @gate enableFlightReadableStream && enableAsyncIterableChildren
   it('preserves debug info for server-to-server pass through of async iterables', async () => {
     let resolve;
     const iteratorPromise = new Promise(r => (resolve = r));
 
-    function ThirdPartyAsyncIterableComponent({item, initial}) {
-      // While the ServerComponent itself could be an async generator, single-shot iterables
-      // are not supported as React children since React might need to re-map them based on
-      // state updates. So we create an AsyncIterable instead.
-      return {
-        async *[Symbol.asyncIterator]() {
-          yield <span>Who</span>;
-          yield <span>dis?</span>;
-          resolve();
-        },
-      };
+    async function* ThirdPartyAsyncIterableComponent({item, initial}) {
+      yield <span>Who</span>;
+      yield <span>dis?</span>;
+      resolve();
     }
-
-    function ListClient({children: fragment}) {
-      // TODO: Unwrap AsyncIterables natively in React. For now we do it in this wrapper.
-      const resolvedChildren = [];
-      const iterator = fragment.props.children[Symbol.asyncIterator]();
-      for (let entry; !(entry = React.use(iterator.next())).done; ) {
-        resolvedChildren.push(entry.value);
-      }
-      return <div>{resolvedChildren}</div>;
-    }
-
-    const List = clientReference(ListClient);
 
     function Keyed({children}) {
       // Keying this should generate a fragment.
@@ -2334,9 +2330,9 @@ describe('ReactFlight', () => {
         ReactNoopFlightClient.read(transport),
       ).root;
       return (
-        <List>
+        <div>
           <Keyed key="keyed">{children}</Keyed>
-        </List>
+        </div>
       );
     }
 

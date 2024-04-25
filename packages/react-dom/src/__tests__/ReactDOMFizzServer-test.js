@@ -3346,7 +3346,7 @@ describe('ReactDOMFizzServer', () => {
     ]);
   });
 
-  it('Supports iterable', async () => {
+  it('supports iterable', async () => {
     const Immutable = require('immutable');
 
     const mappedJSX = Immutable.fromJS([
@@ -3366,7 +3366,71 @@ describe('ReactDOMFizzServer', () => {
     );
   });
 
-  it('Supports bigint', async () => {
+  // @gate enableAsyncIterableChildren
+  it('supports async generator component', async () => {
+    async function* App() {
+      yield <span key="1">{await Promise.resolve('Hi')}</span>;
+      yield ' ';
+      yield <span key="2">{await Promise.resolve('World')}</span>;
+    }
+
+    await act(async () => {
+      const {pipe} = renderToPipeableStream(
+        <div>
+          <App />
+        </div>,
+      );
+      pipe(writable);
+    });
+
+    // Each act retries once which causes a new ping which schedules
+    // new work but only after the act has finished rendering.
+    await act(() => {});
+    await act(() => {});
+    await act(() => {});
+    await act(() => {});
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <span>Hi</span> <span>World</span>
+      </div>,
+    );
+  });
+
+  // @gate enableAsyncIterableChildren
+  it('supports async iterable children', async () => {
+    const iterable = {
+      async *[Symbol.asyncIterator]() {
+        yield <span key="1">{await Promise.resolve('Hi')}</span>;
+        yield ' ';
+        yield <span key="2">{await Promise.resolve('World')}</span>;
+      },
+    };
+
+    function App({children}) {
+      return <div>{children}</div>;
+    }
+
+    await act(() => {
+      const {pipe} = renderToPipeableStream(<App>{iterable}</App>);
+      pipe(writable);
+    });
+
+    // Each act retries once which causes a new ping which schedules
+    // new work but only after the act has finished rendering.
+    await act(() => {});
+    await act(() => {});
+    await act(() => {});
+    await act(() => {});
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <span>Hi</span> <span>World</span>
+      </div>,
+    );
+  });
+
+  it('supports bigint', async () => {
     await act(async () => {
       const {pipe} = ReactDOMFizzServer.renderToPipeableStream(
         <div>{10n}</div>,
@@ -4180,79 +4244,150 @@ describe('ReactDOMFizzServer', () => {
     ]);
   });
 
-  describe('bootstrapScriptContent and importMap escaping', () => {
-    it('the "S" in "</?[Ss]cript" strings are replaced with unicode escaped lowercase s or S depending on case, preserving case sensitivity of nearby characters', async () => {
-      window.__test_outlet = '';
-      const stringWithScriptsInIt =
-        'prescription pre<scription pre<Scription pre</scRipTion pre</ScripTion </script><script><!-- <script> -->';
-      await act(() => {
-        const {pipe} = renderToPipeableStream(<div />, {
-          bootstrapScriptContent:
-            'window.__test_outlet = "This should have been replaced";var x = "' +
-            stringWithScriptsInIt +
-            '";\nwindow.__test_outlet = x;',
+  describe('inline script escaping', () => {
+    describe('bootstrapScriptContent', () => {
+      it('the "S" in "</?[Ss]cript" strings are replaced with unicode escaped lowercase s or S depending on case, preserving case sensitivity of nearby characters', async () => {
+        window.__test_outlet = '';
+        const stringWithScriptsInIt =
+          'prescription pre<scription pre<Scription pre</scRipTion pre</ScripTion </script><script><!-- <script> -->';
+        await act(() => {
+          const {pipe} = renderToPipeableStream(<div />, {
+            bootstrapScriptContent:
+              'window.__test_outlet = "This should have been replaced";var x = "' +
+              stringWithScriptsInIt +
+              '";\nwindow.__test_outlet = x;',
+          });
+          pipe(writable);
         });
-        pipe(writable);
+        expect(window.__test_outlet).toMatch(stringWithScriptsInIt);
       });
-      expect(window.__test_outlet).toMatch(stringWithScriptsInIt);
+
+      it('does not escape \\u2028, or \\u2029 characters', async () => {
+        // these characters are ignored in engines support https://github.com/tc39/proposal-json-superset
+        // in this test with JSDOM the characters are silently dropped and thus don't need to be encoded.
+        // if you send these characters to an older browser they could fail so it is a good idea to
+        // sanitize JSON input of these characters
+        window.__test_outlet = '';
+        const el = document.createElement('p');
+        el.textContent = '{"one":1,\u2028\u2029"two":2}';
+        const stringWithLSAndPSCharacters = el.textContent;
+        await act(() => {
+          const {pipe} = renderToPipeableStream(<div />, {
+            bootstrapScriptContent:
+              'let x = ' +
+              stringWithLSAndPSCharacters +
+              '; window.__test_outlet = x;',
+          });
+          pipe(writable);
+        });
+        const outletString = JSON.stringify(window.__test_outlet);
+        expect(outletString).toBe(
+          stringWithLSAndPSCharacters.replace(/[\u2028\u2029]/g, ''),
+        );
+      });
+
+      it('does not escape <, >, or & characters', async () => {
+        // these characters valid javascript and may be necessary in scripts and won't be interpretted properly
+        // escaped outside of a string context within javascript
+        window.__test_outlet = null;
+        // this boolean expression will be cast to a number due to the bitwise &. we will look for a truthy value (1) below
+        const booleanLogicString = '1 < 2 & 3 > 1';
+        await act(() => {
+          const {pipe} = renderToPipeableStream(<div />, {
+            bootstrapScriptContent:
+              'let x = ' + booleanLogicString + '; window.__test_outlet = x;',
+          });
+          pipe(writable);
+        });
+        expect(window.__test_outlet).toBe(1);
+      });
     });
 
-    it('does not escape \\u2028, or \\u2029 characters', async () => {
-      // these characters are ignored in engines support https://github.com/tc39/proposal-json-superset
-      // in this test with JSDOM the characters are silently dropped and thus don't need to be encoded.
-      // if you send these characters to an older browser they could fail so it is a good idea to
-      // sanitize JSON input of these characters
-      window.__test_outlet = '';
-      const el = document.createElement('p');
-      el.textContent = '{"one":1,\u2028\u2029"two":2}';
-      const stringWithLSAndPSCharacters = el.textContent;
-      await act(() => {
-        const {pipe} = renderToPipeableStream(<div />, {
-          bootstrapScriptContent:
-            'let x = ' +
-            stringWithLSAndPSCharacters +
-            '; window.__test_outlet = x;',
+    describe('importMaps', () => {
+      it('escapes </[sS]cirpt> in importMaps', async () => {
+        window.__test_outlet_key = '';
+        window.__test_outlet_value = '';
+        const jsonWithScriptsInIt = {
+          "keypos</script><script>window.__test_outlet_key = 'pwned'</script><script>":
+            'value',
+          key: "valuepos</script><script>window.__test_outlet_value = 'pwned'</script><script>",
+        };
+        await act(() => {
+          const {pipe} = renderToPipeableStream(<div />, {
+            importMap: jsonWithScriptsInIt,
+          });
+          pipe(writable);
         });
+        expect(window.__test_outlet_key).toBe('');
+        expect(window.__test_outlet_value).toBe('');
+      });
+    });
+
+    describe('inline script', () => {
+      it('escapes </[sS]cirpt> in inline scripts', async () => {
+        window.__test_outlet = '';
+        await act(() => {
+          const {pipe} = renderToPipeableStream(
+            <script>{`
+              <!-- some html comment </script><script>window.__test_outlet = 'pwned'</script>
+              window.__test_outlet = 'safe';
+              --> </script><script>window.__test_outlet = 'pwned after'</script>
+            `}</script>,
+          );
+          pipe(writable);
+        });
+        expect(window.__test_outlet).toBe('safe');
+      });
+    });
+  });
+
+  describe('<style> textContent escaping', () => {
+    it('the "S" in "</?[Ss]style" strings are replaced with unicode escaped lowercase s or S depending on case, preserving case sensitivity of nearby characters', async () => {
+      await act(() => {
+        const {pipe} = renderToPipeableStream(
+          <style>{`
+            .foo::after {
+              content: 'sSsS</style></Style></StYlE><style><Style>sSsS'
+            }
+            body {
+              background-color: blue;
+            }
+          `}</style>,
+        );
         pipe(writable);
       });
-      const outletString = JSON.stringify(window.__test_outlet);
-      expect(outletString).toBe(
-        stringWithLSAndPSCharacters.replace(/[\u2028\u2029]/g, ''),
+      expect(window.getComputedStyle(document.body).backgroundColor).toMatch(
+        'blue',
       );
     });
 
-    it('does not escape <, >, or & characters', async () => {
-      // these characters valid javascript and may be necessary in scripts and won't be interpretted properly
-      // escaped outside of a string context within javascript
-      window.__test_outlet = null;
-      // this boolean expression will be cast to a number due to the bitwise &. we will look for a truthy value (1) below
-      const booleanLogicString = '1 < 2 & 3 > 1';
+    it('the "S" in "</?[Ss]style" strings are replaced with unicode escaped lowercase s or S depending on case, preserving case sensitivity of nearby characters inside hoistable style tags', async () => {
       await act(() => {
-        const {pipe} = renderToPipeableStream(<div />, {
-          bootstrapScriptContent:
-            'let x = ' + booleanLogicString + '; window.__test_outlet = x;',
-        });
+        const {pipe} = renderToPipeableStream(
+          <>
+            <style href="foo" precedence="default">{`
+            .foo::after {
+              content: 'sSsS</style></Style></StYlE><style><Style>sSsS'
+            }
+            body {
+              background-color: blue;
+            }
+          `}</style>
+            <style href="bar" precedence="default">{`
+          .foo::after {
+            content: 'sSsS</style></Style></StYlE><style><Style>sSsS'
+          }
+          body {
+            background-color: red;
+          }
+        `}</style>
+          </>,
+        );
         pipe(writable);
       });
-      expect(window.__test_outlet).toBe(1);
-    });
-
-    it('escapes </[sS]cirpt> in importMaps', async () => {
-      window.__test_outlet_key = '';
-      window.__test_outlet_value = '';
-      const jsonWithScriptsInIt = {
-        "keypos</script><script>window.__test_outlet_key = 'pwned'</script><script>":
-          'value',
-        key: "valuepos</script><script>window.__test_outlet_value = 'pwned'</script><script>",
-      };
-      await act(() => {
-        const {pipe} = renderToPipeableStream(<div />, {
-          importMap: jsonWithScriptsInIt,
-        });
-        pipe(writable);
-      });
-      expect(window.__test_outlet_key).toBe('');
-      expect(window.__test_outlet_value).toBe('');
+      expect(window.getComputedStyle(document.body).backgroundColor).toMatch(
+        'red',
+      );
     });
   });
 
@@ -7912,5 +8047,86 @@ describe('ReactDOMFizzServer', () => {
       ),
     ]);
     expect(postpones).toEqual([]);
+  });
+
+  it('should NOT warn for using generator functions as components', async () => {
+    function* Foo() {
+      yield <h1 key="1">Hello</h1>;
+      yield <h1 key="2">World</h1>;
+    }
+
+    await act(() => {
+      const {pipe} = renderToPipeableStream(<Foo />);
+      pipe(writable);
+    });
+
+    expect(document.body.textContent).toBe('HelloWorld');
+  });
+
+  it('should warn for using generators as children props', async () => {
+    function* getChildren() {
+      yield <h1 key="1">Hello</h1>;
+      yield <h1 key="2">World</h1>;
+    }
+
+    function Foo() {
+      const children = getChildren();
+      return <div>{children}</div>;
+    }
+
+    await expect(async () => {
+      await act(() => {
+        const {pipe} = renderToPipeableStream(<Foo />);
+        pipe(writable);
+      });
+    }).toErrorDev(
+      'Using Iterators as children is unsupported and will likely yield ' +
+        'unexpected results because enumerating a generator mutates it. ' +
+        'You may convert it to an array with `Array.from()` or the ' +
+        '`[...spread]` operator before rendering. You can also use an ' +
+        'Iterable that can iterate multiple times over the same items.\n' +
+        '    in div (at **)\n' +
+        '    in Foo (at **)',
+    );
+
+    expect(document.body.textContent).toBe('HelloWorld');
+  });
+
+  it('should warn for using other types of iterators as children', async () => {
+    function Foo() {
+      let i = 0;
+      const iterator = {
+        [Symbol.iterator]() {
+          return iterator;
+        },
+        next() {
+          switch (i++) {
+            case 0:
+              return {done: false, value: <h1 key="1">Hello</h1>};
+            case 1:
+              return {done: false, value: <h1 key="2">World</h1>};
+            default:
+              return {done: true, value: undefined};
+          }
+        },
+      };
+      return iterator;
+    }
+
+    await expect(async () => {
+      await act(() => {
+        const {pipe} = renderToPipeableStream(<Foo />);
+        pipe(writable);
+      });
+    }).toErrorDev(
+      'Using Iterators as children is unsupported and will likely yield ' +
+        'unexpected results because enumerating a generator mutates it. ' +
+        'You may convert it to an array with `Array.from()` or the ' +
+        '`[...spread]` operator before rendering. You can also use an ' +
+        'Iterable that can iterate multiple times over the same items.\n' +
+        '    in Foo (at **)',
+    );
+
+    expect(document.body.textContent).toBe('HelloWorld');
   });
 });

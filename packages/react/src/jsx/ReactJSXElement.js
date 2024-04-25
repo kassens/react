@@ -162,7 +162,7 @@ function elementRefGetterWithDeprecationWarning() {
 /**
  * Factory method to create a new React element. This no longer adheres to
  * the class pattern, so do not use new to call it. Also, instanceof check
- * will not work. Instead test $$typeof field against Symbol.for('react.element') to check
+ * will not work. Instead test $$typeof field against Symbol.for('react.transitional.element') to check
  * if something is a React Element.
  *
  * @param {*} type
@@ -738,9 +738,7 @@ export function createElement(type, config, children) {
         console.warn(
           'Your app (or one of its dependencies) is using an outdated JSX ' +
             'transform. Update to the modern JSX transform for ' +
-            'faster performance: ' +
-            // TODO: Create a short link for this
-            'https://reactjs.org/blog/2020/09/22/introducing-the-new-jsx-transform.html',
+            'faster performance: https://react.dev/link/new-jsx-transform',
         );
       }
     }
@@ -1028,10 +1026,12 @@ function validateChildKeys(node, parentType) {
         // but now we print a separate warning for them later.
         if (iteratorFn !== node.entries) {
           const iterator = iteratorFn.call(node);
-          let step;
-          while (!(step = iterator.next()).done) {
-            if (isValidElement(step.value)) {
-              validateExplicitKey(step.value, parentType);
+          if (iterator !== node) {
+            let step;
+            while (!(step = iterator.next()).done) {
+              if (isValidElement(step.value)) {
+                validateExplicitKey(step.value, parentType);
+              }
             }
           }
         }

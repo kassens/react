@@ -43,9 +43,9 @@ export const enableProfilerNestedUpdatePhase = __PROFILE__;
 export const enableUpdaterTracking = __PROFILE__;
 export const enableCache = true;
 export const enableLegacyCache = false;
-export const enableFetchInstrumentation = false;
 export const enableBinaryFlight = true;
 export const enableFlightReadableStream = true;
+export const enableAsyncIterableChildren = false;
 export const enableTaint = true;
 export const enablePostpone = false;
 export const debugRenderPhaseSideEffectsForStrictMode = __DEV__;
@@ -62,11 +62,14 @@ export const enableSuspenseAvoidThisFallback = false;
 export const enableSuspenseAvoidThisFallbackFizz = false;
 export const enableCPUSuspense = true;
 export const enableUseMemoCacheHook = true;
+export const enableNoCloningMemoCache = false;
 export const enableUseEffectEventHook = false;
 export const favorSafetyOverHydrationPerf = true;
 export const enableLegacyFBSupport = false;
 export const enableFilterEmptyStringAttributesDOM = true;
 export const enableGetInspectorDataForInstanceInProduction = true;
+
+export const renameElementSymbol = false;
 
 export const enableRetryLaneExpiration = false;
 export const retryLaneExpirationMs = 5000;
