@@ -416,7 +416,7 @@ export type Dispatcher = {
   ): T,
   useId(): string,
   useCacheRefresh?: () => <T>(?() => T, ?T) => void,
-  useMemoCache?: (size: number) => Array<any>,
+  useMemoCache: (size: number) => Array<any>,
   useHostTransitionStatus?: () => TransitionStatus,
   useOptimistic?: <S, A>(
     passthrough: S,
@@ -434,6 +434,8 @@ export type Dispatcher = {
   ) => [Awaited<S>, (P) => void, boolean],
 };
 
-export type CacheDispatcher = {
+export type AsyncDispatcher = {
   getCacheForType: <T>(resourceType: () => T) => T,
+  // DEV-only (or !disableStringRefs)
+  getOwner: () => null | Fiber | ReactComponentInfo,
 };
