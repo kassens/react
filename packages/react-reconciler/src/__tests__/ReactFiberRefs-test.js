@@ -189,4 +189,55 @@ describe('ReactFiberRefs', () => {
     const refsInstance = Array.from(refsCollection)[0];
     expect(Object.isFrozen(refsInstance)).toBe(__DEV__);
   });
+
+  // @gate !disableStringRefs
+  test('string refs keep props stable', async () => {
+    gate(flags => {
+      console.log('flags', flags.enableRefAsProp, flags.disableStringRefs);
+    });
+
+    const root = ReactNoop.createRoot();
+
+    let childInstance = null;
+    let samePropsCount = 0;
+    let differentPropsCount = 0;
+
+    class App extends React.Component {
+      render() {
+        return <Child ref="someRef" />;
+      }
+    }
+
+    class Child extends React.Component {
+      render() {
+        return 'Child';
+      }
+      componentDidMount() {
+        childInstance = this;
+        // this.setState({mounted: true});
+      }
+      componentDidUpdate(prevProps: Object): void {
+        if (this.props === prevProps) {
+          samePropsCount++;
+        } else {
+          differentPropsCount++;
+        }
+      }
+    }
+    await expect(async () => {
+      await act(async () => {
+        root.render(<App />);
+      });
+    }).toErrorDev('Component "App" contains the string ref "someRef".');
+
+    expect(samePropsCount).toBe(0);
+    expect(differentPropsCount).toBe(0);
+
+    await act(async () => {
+      childInstance.setState({updated: true});
+    });
+
+    expect(samePropsCount).toBe(1);
+    expect(differentPropsCount).toBe(0);
+  });
 });
