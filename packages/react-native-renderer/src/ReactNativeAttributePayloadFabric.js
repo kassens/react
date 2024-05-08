@@ -15,6 +15,7 @@ import {
 import isArray from 'shared/isArray';
 
 import {enableEarlyReturnForPropDiffing} from 'shared/ReactFeatureFlags';
+import {enableAddPropertiesFastPath} from 'shared/ReactFeatureFlags';
 
 import type {AttributeConfiguration} from './ReactNativeTypes';
 
@@ -444,6 +445,68 @@ function diffProperties(
   return updatePayload;
 }
 
+function fastAddProperties(
+  payload: null | Object,
+  props: Object,
+  validAttributes: AttributeConfiguration,
+): null | Object {
+  let attributeConfig;
+  let prop;
+
+  for (const propKey in props) {
+    prop = props[propKey];
+
+    if (prop === undefined) {
+      continue;
+    }
+
+    attributeConfig = ((validAttributes[propKey]: any): AttributeConfiguration);
+
+    if (attributeConfig == null) {
+      continue;
+    }
+
+    let newValue;
+
+    if (typeof prop === 'function') {
+      // A function prop. It represents an event handler. Pass it to native as 'true'.
+      newValue = true;
+    } else if (typeof attributeConfig !== 'object') {
+      // An atomic prop. Doesn't need to be flattened.
+      newValue = prop;
+    } else if (typeof attributeConfig.process === 'function') {
+      // An atomic prop with custom processing.
+      newValue = attributeConfig.process(prop);
+    } else if (typeof attributeConfig.diff === 'function') {
+      // An atomic prop with custom diffing. We don't do diffing here.
+      newValue = prop;
+    }
+
+    if (newValue !== undefined) {
+      if (!payload) {
+        payload = ({}: {[string]: $FlowFixMe});
+      }
+      payload[propKey] = newValue;
+      continue;
+    }
+
+    // Not-atomic prop that needs to be flattened. Likely it's the 'style' prop.
+
+    // It can be an array.
+    if (isArray(prop)) {
+      for (let i = 0; i < prop.length; i++) {
+        payload = fastAddProperties(payload, prop[i], attributeConfig);
+      }
+      continue;
+    }
+
+    // Or it can be an object.
+    payload = fastAddProperties(payload, prop, attributeConfig);
+  }
+
+  return payload;
+}
+
 /**
  * addProperties adds all the valid props to the payload after being processed.
  */
@@ -452,8 +515,11 @@ function addProperties(
   props: Object,
   validAttributes: AttributeConfiguration,
 ): null | Object {
-  // TODO: Fast path
-  return diffProperties(updatePayload, emptyObject, props, validAttributes);
+  if (enableAddPropertiesFastPath) {
+    return fastAddProperties(updatePayload, props, validAttributes);
+  } else {
+    return diffProperties(updatePayload, emptyObject, props, validAttributes);
+  }
 }
 
 /**
