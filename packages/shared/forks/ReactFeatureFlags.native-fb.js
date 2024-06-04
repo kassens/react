@@ -22,14 +22,10 @@ export const {
   alwaysThrottleRetries,
   consoleManagedByDevToolsDuringStrictMode,
   disableDefaultPropsExceptForClasses,
-  disableStringRefs,
   enableAddPropertiesFastPath,
   enableDeferRootSchedulingToMicrotask,
-  enableEarlyReturnForPropDiffing,
   enableFastJSX,
   enableInfiniteRenderLoopDetection,
-  enableRefAsProp,
-  enableUnifiedSyncLane,
   passChildrenWhenCloningPersistedNodes,
 } = dynamicFlags;
 
@@ -43,6 +39,7 @@ export const enableProfilerTimer = __PROFILE__;
 export const enableProfilerCommitHooks = __PROFILE__;
 export const enableProfilerNestedUpdatePhase = __PROFILE__;
 export const enableUpdaterTracking = __PROFILE__;
+export const enableUnifiedSyncLane = true;
 export const enableCache = true;
 export const enableComponentStackLocations = true;
 export const enableLegacyCache = false;
@@ -96,9 +93,12 @@ export const disableClientCache = true;
 
 export const enableServerComponentLogs = true;
 
+export const enableRefAsProp = true;
+export const disableStringRefs = true;
+
 export const enableReactTestRendererWarning = false;
 export const disableLegacyMode = false;
-export const disableDOMTestUtils = false;
+export const enableOwnerStacks = false;
 
 // Flow magic to verify the exports of this file match the original version.
 ((((null: any): ExportsType): FeatureFlagsType): ExportsType);

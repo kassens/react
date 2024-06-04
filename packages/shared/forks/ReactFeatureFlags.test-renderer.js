@@ -76,7 +76,6 @@ export const disableClientCache = true;
 
 export const enableServerComponentLogs = true;
 export const enableInfiniteRenderLoopDetection = false;
-export const enableEarlyReturnForPropDiffing = false;
 export const enableAddPropertiesFastPath = false;
 
 export const renameElementSymbol = true;
@@ -93,10 +92,11 @@ export const disableStringRefs = true;
 export const enableFastJSX = true;
 export const disableLegacyMode = true;
 export const disableLegacyContext = true;
-export const disableDOMTestUtils = true;
 export const enableRenderableContext = true;
 export const enableReactTestRendererWarning = true;
 export const disableDefaultPropsExceptForClasses = true;
+
+export const enableOwnerStacks = false;
 
 // Flow magic to verify the exports of this file match the original version.
 ((((null: any): ExportsType): FeatureFlagsType): ExportsType);

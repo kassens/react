@@ -79,8 +79,8 @@ export const enableLegacyFBSupport = false;
 export const enableCache = true;
 export const enableLegacyCache = __EXPERIMENTAL__;
 
-export const enableBinaryFlight = __EXPERIMENTAL__;
-export const enableFlightReadableStream = __EXPERIMENTAL__;
+export const enableBinaryFlight = true;
+export const enableFlightReadableStream = true;
 export const enableAsyncIterableChildren = __EXPERIMENTAL__;
 
 export const enableTaint = __EXPERIMENTAL__;
@@ -121,9 +121,9 @@ export const passChildrenWhenCloningPersistedNodes = false;
 
 export const enableServerComponentLogs = __EXPERIMENTAL__;
 
-export const enableEarlyReturnForPropDiffing = false;
-
 export const enableAddPropertiesFastPath = false;
+
+export const enableOwnerStacks = __EXPERIMENTAL__;
 
 /**
  * Enables an expiration time for retry lanes to avoid starvation.
@@ -191,8 +191,6 @@ export const enableReactTestRendererWarning = true;
 // This allows us to land breaking changes to remove legacy mode APIs in experimental builds
 // before removing them in stable in the next Major
 export const disableLegacyMode = true;
-
-export const disableDOMTestUtils = true;
 
 // Make <Context> equivalent to <Context.Provider> instead of <Context.Consumer>
 export const enableRenderableContext = true;

@@ -31,7 +31,6 @@ export const {
   transitionLaneExpirationMs,
   enableInfiniteRenderLoopDetection,
   enableRenderableContext,
-  enableRefAsProp,
   favorSafetyOverHydrationPerf,
   disableDefaultPropsExceptForClasses,
   enableNoCloningMemoCache,
@@ -72,8 +71,8 @@ export const renameElementSymbol = false;
 export const enableCache = true;
 export const enableLegacyCache = true;
 
-export const enableBinaryFlight = false;
-export const enableFlightReadableStream = false;
+export const enableBinaryFlight = true;
+export const enableFlightReadableStream = true;
 export const enableAsyncIterableChildren = false;
 
 export const enableTaint = false;
@@ -93,6 +92,8 @@ export const enableSuspenseCallback = true;
 export const enableLegacyHidden = true;
 
 export const enableComponentStackLocations = true;
+
+export const enableRefAsProp = true;
 
 export const disableTextareaChildren = __EXPERIMENTAL__;
 
@@ -120,8 +121,7 @@ export const disableStringRefs = false;
 
 export const disableLegacyMode = __EXPERIMENTAL__;
 
-export const disableDOMTestUtils = false;
-export const enableEarlyReturnForPropDiffing = false;
+export const enableOwnerStacks = false;
 
 // Flow magic to verify the exports of this file match the original version.
 ((((null: any): ExportsType): FeatureFlagsType): ExportsType);

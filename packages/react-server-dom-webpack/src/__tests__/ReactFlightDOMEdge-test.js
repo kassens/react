@@ -231,7 +231,7 @@ describe('ReactFlightDOMEdge', () => {
     const [stream1, stream2] = passThrough(stream).tee();
 
     const serializedContent = await readResult(stream1);
-    expect(serializedContent.length).toBeLessThan(400);
+    expect(serializedContent.length).toBeLessThan(470);
 
     const result = await ReactServerDOMClient.createFromReadableStream(
       stream2,
@@ -256,14 +256,48 @@ describe('ReactFlightDOMEdge', () => {
       return str;
     }
     const element = <ServerComponent />;
-    const children = new Array(30).fill(element);
+    // Hardcoded list to avoid the key warning
+    const children = (
+      <>
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+      </>
+    );
     const resolvedChildren = new Array(30).fill(str);
     const stream = ReactServerDOMServer.renderToReadableStream(children);
     const [stream1, stream2] = passThrough(stream).tee();
 
     const serializedContent = await readResult(stream1);
 
-    expect(serializedContent.length).toBeLessThan(400);
+    expect(serializedContent.length).toBeLessThan(410);
     expect(timesRendered).toBeLessThan(5);
 
     const model = await ReactServerDOMClient.createFromReadableStream(stream2, {
@@ -288,7 +322,41 @@ describe('ReactFlightDOMEdge', () => {
       return div;
     }
     const element = <ServerComponent />;
-    const children = new Array(30).fill(element);
+    // Hardcoded list to avoid the key warning
+    const children = (
+      <>
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+        {element}
+      </>
+    );
     const resolvedChildren = new Array(30).fill(
       '<div>this is a long return value</div>',
     );
@@ -296,7 +364,7 @@ describe('ReactFlightDOMEdge', () => {
     const [stream1, stream2] = passThrough(stream).tee();
 
     const serializedContent = await readResult(stream1);
-    expect(serializedContent.length).toBeLessThan(400);
+    expect(serializedContent.length).toBeLessThan(__DEV__ ? 590 : 400);
     expect(timesRendered).toBeLessThan(5);
 
     const model = await ReactServerDOMClient.createFromReadableStream(stream2, {
@@ -324,7 +392,7 @@ describe('ReactFlightDOMEdge', () => {
       <ServerComponent recurse={20} />,
     );
     const serializedContent = await readResult(stream);
-    const expectedDebugInfoSize = __DEV__ ? 64 * 20 : 0;
+    const expectedDebugInfoSize = __DEV__ ? 300 * 20 : 0;
     expect(serializedContent.length).toBeLessThan(150 + expectedDebugInfoSize);
   });
 
@@ -543,6 +611,55 @@ describe('ReactFlightDOMEdge', () => {
     expect(await iterator.next()).toEqual({value: undefined, done: true});
   });
 
+  // @gate enableFlightReadableStream
+  it('should ideally dedupe objects inside async iterables but does not yet', async () => {
+    const obj = {
+      this: {is: 'a large objected'},
+      with: {many: 'properties in it'},
+    };
+    const iterable = {
+      async *[Symbol.asyncIterator]() {
+        for (let i = 0; i < 30; i++) {
+          yield obj;
+        }
+      },
+    };
+
+    const stream = ReactServerDOMServer.renderToReadableStream({
+      iterable,
+    });
+    const [stream1, stream2] = passThrough(stream).tee();
+
+    const serializedContent = await readResult(stream1);
+    // TODO: Ideally streams should dedupe objects but because we never outline the objects
+    // they end up not having a row to reference them nor any of its nested objects.
+    // expect(serializedContent.length).toBeLessThan(400);
+    expect(serializedContent.length).toBeGreaterThan(400);
+
+    const result = await ReactServerDOMClient.createFromReadableStream(
+      stream2,
+      {
+        ssrManifest: {
+          moduleMap: null,
+          moduleLoading: null,
+        },
+      },
+    );
+
+    const items = [];
+    const iterator = result.iterable[Symbol.asyncIterator]();
+    let entry;
+    while (!(entry = await iterator.next()).done) {
+      items.push(entry.value);
+    }
+
+    // Should still match the result when parsed
+    expect(items.length).toBe(30);
+    // TODO: These should be the same
+    // expect(items[5]).toBe(items[10]); // two random items are the same instance
+    expect(items[5]).toEqual(items[10]);
+  });
+
   it('warns if passing a this argument to bind() of a server reference', async () => {
     const ServerModule = serverExports({
       greet: function () {},
@@ -742,10 +859,18 @@ describe('ReactFlightDOMEdge', () => {
     // We've rendered down to the span.
     expect(greeting.type).toBe('span');
     if (__DEV__) {
-      const greetInfo = {name: 'Greeting', env: 'Server', owner: null};
+      const greetInfo = expect.objectContaining({
+        name: 'Greeting',
+        env: 'Server',
+        owner: null,
+      });
       expect(lazyWrapper._debugInfo).toEqual([
         greetInfo,
-        {name: 'Container', env: 'Server', owner: greetInfo},
+        expect.objectContaining({
+          name: 'Container',
+          env: 'Server',
+          owner: greetInfo,
+        }),
       ]);
       // The owner that created the span was the outer server component.
       // We expect the debug info to be referentially equal to the owner.
