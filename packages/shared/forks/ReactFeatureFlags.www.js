@@ -15,6 +15,7 @@ import typeof * as DynamicFeatureFlags from './ReactFeatureFlags.www-dynamic';
 const dynamicFeatureFlags: DynamicFeatureFlags = require('ReactFeatureFlags');
 
 export const {
+  disableLegacyMode: disableLegacyModeDynamic,
   enableTrustedTypesIntegration,
   enableDebugTracing,
   enableLazyContextPropagation,
@@ -119,7 +120,7 @@ export const useModernStrictMode = true;
 // because JSX is an extremely hot path.
 export const disableStringRefs = false;
 
-export const disableLegacyMode = __EXPERIMENTAL__;
+export const disableLegacyMode = __EXPERIMENTAL__ || disableLegacyModeDynamic;
 
 export const enableOwnerStacks = false;
 export const enableShallowPropDiffing = false;
