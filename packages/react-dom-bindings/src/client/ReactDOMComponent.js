@@ -406,6 +406,12 @@ function setProp(
       break;
     }
     // These attributes accept URLs. These must not allow javascript: URLS.
+    case 'data':
+      if (tag !== 'object') {
+        setValueForKnownAttribute(domElement, 'data', value);
+        break;
+      }
+    // fallthrough
     case 'src':
     case 'href': {
       if (enableFilterEmptyStringAttributesDOM) {
@@ -2453,6 +2459,14 @@ function diffHydratedGenericElement(
         warnForPropDifference(propKey, serverValue, value, serverDifferences);
         continue;
       }
+      case 'data':
+        if (tag !== 'object') {
+          extraAttributes.delete(propKey);
+          const serverValue = (domElement: any).muted; // TODO would expect this to fail a test somewhere
+          warnForPropDifference(propKey, serverValue, value, serverDifferences);
+          continue;
+        }
+      // fallthrough
       case 'src':
       case 'href':
         if (enableFilterEmptyStringAttributesDOM) {

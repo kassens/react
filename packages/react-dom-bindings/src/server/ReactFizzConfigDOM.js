@@ -1202,6 +1202,7 @@ function pushAttribute(
       pushStyleAttribute(target, value);
       return;
     }
+    case 'data':
     case 'src':
     case 'href': {
       if (enableFilterEmptyStringAttributesDOM) {
