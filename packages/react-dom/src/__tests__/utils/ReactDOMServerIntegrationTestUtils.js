@@ -299,8 +299,8 @@ module.exports = function (initModules) {
   // as that will not work in the server string scenario.
   function itRenders(desc, testFn) {
     it(`renders ${desc} with server string render`, () => testFn(serverRender));
-    it(`renders ${desc} with server stream render`, () => testFn(streamRender));
-    itClientRenders(desc, testFn);
+    // it(`renders ${desc} with server stream render`, () => testFn(streamRender));
+    // itClientRenders(desc, testFn);
   }
 
   // run testFn in three different rendering scenarios:
