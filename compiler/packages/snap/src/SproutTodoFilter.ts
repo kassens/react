@@ -444,7 +444,6 @@ const skipFilter = new Set([
   "loop-unused-let",
   "reanimated-no-memo-arg",
 
-  // Tested e2e in forget-feedback repo
   "userspace-use-memo-cache",
   "transitive-freeze-function-expressions",
 
@@ -488,6 +487,7 @@ const skipFilter = new Set([
   "bug-invalid-hoisting-functionexpr",
   "original-reactive-scopes-fork/bug-nonmutating-capture-in-unsplittable-memo-block",
   "original-reactive-scopes-fork/bug-hoisted-declaration-with-scope",
+  "bug-codegen-inline-iife",
 
   // 'react-compiler-runtime' not yet supported
   "flag-enable-emit-hook-guards",
