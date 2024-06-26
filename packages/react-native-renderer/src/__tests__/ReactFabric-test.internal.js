@@ -29,6 +29,9 @@ describe('ReactFabric', () => {
   beforeEach(() => {
     jest.resetModules();
 
+    // TODO: migrate these tests off of the legacy API
+    require('shared/ReactFeatureFlags').disableLegacyMode = false;
+
     require('react-native/Libraries/ReactPrivate/InitializeNativeFabricUIManager');
 
     React = require('react');
