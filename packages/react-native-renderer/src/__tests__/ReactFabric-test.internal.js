@@ -198,9 +198,9 @@ describe('ReactFabric', () => {
     ).toEqual({
       bar: 'b',
     });
-    expect(
-      nativeFabricUIManager.__dumpHierarchyForJestTestsOnly(),
-    ).toMatchSnapshot();
+    expect(nativeFabricUIManager.__dumpHierarchyForJestTestsOnly()).toBe(`11
+ RCTText {"foo":"a","bar":"b"}
+   RCTRawText {"text":"1"}`);
 
     await act(() => {
       ReactFabric.render(
@@ -220,9 +220,9 @@ describe('ReactFabric', () => {
     ).toEqual({
       foo: 'b',
     });
-    expect(
-      nativeFabricUIManager.__dumpHierarchyForJestTestsOnly(),
-    ).toMatchSnapshot();
+    expect(nativeFabricUIManager.__dumpHierarchyForJestTestsOnly()).toBe(`11
+ RCTText {"foo":"b","bar":"b"}
+   RCTRawText {"text":"2"}`);
   });
 
   // @gate persistent
@@ -451,16 +451,54 @@ describe('ReactFabric', () => {
     await act(() => {
       ReactFabric.render(<Component chars={before} />, 11);
     });
-    expect(
-      nativeFabricUIManager.__dumpHierarchyForJestTestsOnly(),
-    ).toMatchSnapshot();
+    expect(nativeFabricUIManager.__dumpHierarchyForJestTestsOnly()).toBe(`11
+ RCTView null
+   RCTView {"title":"a"}
+   RCTView {"title":"b"}
+   RCTView {"title":"c"}
+   RCTView {"title":"d"}
+   RCTView {"title":"e"}
+   RCTView {"title":"f"}
+   RCTView {"title":"g"}
+   RCTView {"title":"h"}
+   RCTView {"title":"i"}
+   RCTView {"title":"j"}
+   RCTView {"title":"k"}
+   RCTView {"title":"l"}
+   RCTView {"title":"m"}
+   RCTView {"title":"n"}
+   RCTView {"title":"o"}
+   RCTView {"title":"p"}
+   RCTView {"title":"q"}
+   RCTView {"title":"r"}
+   RCTView {"title":"s"}
+   RCTView {"title":"t"}`);
 
     await act(() => {
       ReactFabric.render(<Component chars={after} />, 11);
     });
-    expect(
-      nativeFabricUIManager.__dumpHierarchyForJestTestsOnly(),
-    ).toMatchSnapshot();
+    expect(nativeFabricUIManager.__dumpHierarchyForJestTestsOnly()).toBe(`11
+ RCTView null
+   RCTView {"title":"m"}
+   RCTView {"title":"x"}
+   RCTView {"title":"h"}
+   RCTView {"title":"p"}
+   RCTView {"title":"g"}
+   RCTView {"title":"w"}
+   RCTView {"title":"f"}
+   RCTView {"title":"r"}
+   RCTView {"title":"a"}
+   RCTView {"title":"l"}
+   RCTView {"title":"k"}
+   RCTView {"title":"e"}
+   RCTView {"title":"o"}
+   RCTView {"title":"i"}
+   RCTView {"title":"v"}
+   RCTView {"title":"c"}
+   RCTView {"title":"s"}
+   RCTView {"title":"t"}
+   RCTView {"title":"z"}
+   RCTView {"title":"y"}`);
   });
 
   // @gate persistent
@@ -500,18 +538,60 @@ describe('ReactFabric', () => {
         11,
       );
     });
-    expect(
-      nativeFabricUIManager.__dumpHierarchyForJestTestsOnly(),
-    ).toMatchSnapshot();
+    expect(nativeFabricUIManager.__dumpHierarchyForJestTestsOnly()).toBe(
+      `11
+ RCTView null
+   RCTView null
+     RCTView {"title":"a"}
+     RCTView {"title":"b"}
+     RCTView {"title":"c"}
+     RCTView {"title":"d"}
+     RCTView {"title":"e"}
+     RCTView {"title":"f"}
+     RCTView {"title":"g"}
+     RCTView {"title":"h"}
+     RCTView {"title":"i"}
+     RCTView {"title":"j"}
+     RCTView {"title":"k"}
+     RCTView {"title":"l"}
+     RCTView {"title":"m"}
+     RCTView {"title":"n"}
+     RCTView {"title":"o"}
+     RCTView {"title":"p"}
+     RCTView {"title":"q"}
+     RCTView {"title":"r"}
+     RCTView {"title":"s"}
+     RCTView {"title":"t"}`,
+    );
 
     // Call setState() so that we skip over the top-level host node.
     // It should still get recreated despite a bailout.
     ref.current.setState({
       chars: after,
     });
-    expect(
-      nativeFabricUIManager.__dumpHierarchyForJestTestsOnly(),
-    ).toMatchSnapshot();
+    expect(nativeFabricUIManager.__dumpHierarchyForJestTestsOnly()).toBe(`11
+ RCTView null
+   RCTView null
+     RCTView {"title":"m"}
+     RCTView {"title":"x"}
+     RCTView {"title":"h"}
+     RCTView {"title":"p"}
+     RCTView {"title":"g"}
+     RCTView {"title":"w"}
+     RCTView {"title":"f"}
+     RCTView {"title":"r"}
+     RCTView {"title":"a"}
+     RCTView {"title":"l"}
+     RCTView {"title":"k"}
+     RCTView {"title":"e"}
+     RCTView {"title":"o"}
+     RCTView {"title":"i"}
+     RCTView {"title":"v"}
+     RCTView {"title":"c"}
+     RCTView {"title":"s"}
+     RCTView {"title":"t"}
+     RCTView {"title":"z"}
+     RCTView {"title":"y"}`);
   });
 
   // @gate persistent
@@ -556,7 +636,10 @@ describe('ReactFabric', () => {
         22,
       );
     });
-    expect(snapshots).toMatchSnapshot();
+    expect(snapshots).toEqual([
+      `RCTView {"foo":"a"}
+  RCTView {"foo":"b"}`,
+    ]);
   });
 
   // @gate persistent
