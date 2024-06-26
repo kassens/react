@@ -25,13 +25,12 @@ const SEND_ACCESSIBILITY_EVENT_REQUIRES_HOST_COMPONENT =
   "sendAccessibilityEvent was called with a ref that isn't a " +
   'native component. Use React.forwardRef to get access to the underlying native component';
 
-jest.mock('shared/ReactFeatureFlags', () =>
-  require('shared/forks/ReactFeatureFlags.native-oss'),
-);
-
 describe('ReactFabric', () => {
   beforeEach(() => {
     jest.resetModules();
+
+    // TODO: migrate these tests off of the legacy API
+    require('shared/ReactFeatureFlags').disableLegacyMode = false;
 
     require('react-native/Libraries/ReactPrivate/InitializeNativeFabricUIManager');
 
@@ -45,6 +44,7 @@ describe('ReactFabric', () => {
     act = require('internal-test-utils').act;
   });
 
+  // @gate persistent
   it('should be able to create and render a native component', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -59,6 +59,7 @@ describe('ReactFabric', () => {
     expect(nativeFabricUIManager.completeRoot).toBeCalled();
   });
 
+  // @gate persistent
   it('should be able to create and update a native component', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -93,6 +94,7 @@ describe('ReactFabric', () => {
     });
   });
 
+  // @gate persistent
   it('should not call FabricUIManager.cloneNode after render for properties that have not changed', async () => {
     const Text = createReactNativeComponentClass('RCTText', () => ({
       validAttributes: {foo: true},
@@ -164,6 +166,7 @@ describe('ReactFabric', () => {
     ).toHaveBeenCalledTimes(1);
   });
 
+  // @gate persistent
   it('should only pass props diffs to FabricUIManager.cloneNode', async () => {
     const Text = createReactNativeComponentClass('RCTText', () => ({
       validAttributes: {foo: true, bar: true},
@@ -198,9 +201,9 @@ describe('ReactFabric', () => {
     ).toEqual({
       bar: 'b',
     });
-    expect(
-      nativeFabricUIManager.__dumpHierarchyForJestTestsOnly(),
-    ).toMatchSnapshot();
+    expect(nativeFabricUIManager.__dumpHierarchyForJestTestsOnly()).toBe(`11
+ RCTText {"foo":"a","bar":"b"}
+   RCTRawText {"text":"1"}`);
 
     await act(() => {
       ReactFabric.render(
@@ -220,11 +223,12 @@ describe('ReactFabric', () => {
     ).toEqual({
       foo: 'b',
     });
-    expect(
-      nativeFabricUIManager.__dumpHierarchyForJestTestsOnly(),
-    ).toMatchSnapshot();
+    expect(nativeFabricUIManager.__dumpHierarchyForJestTestsOnly()).toBe(`11
+ RCTText {"foo":"b","bar":"b"}
+   RCTRawText {"text":"2"}`);
   });
 
+  // @gate persistent
   it('should not clone nodes without children when updating props', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -273,6 +277,7 @@ describe('ReactFabric', () => {
     expect(nativeFabricUIManager.completeRoot).toBeCalled();
   });
 
+  // @gate persistent
   it('should call dispatchCommand for native refs', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -303,6 +308,7 @@ describe('ReactFabric', () => {
     );
   });
 
+  // @gate persistent
   it('should warn and no-op if calling dispatchCommand on non native refs', async () => {
     class BasicClass extends React.Component {
       render() {
@@ -334,6 +340,7 @@ describe('ReactFabric', () => {
     expect(nativeFabricUIManager.dispatchCommand).not.toBeCalled();
   });
 
+  // @gate persistent
   it('should call sendAccessibilityEvent for native refs', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -365,6 +372,7 @@ describe('ReactFabric', () => {
     );
   });
 
+  // @gate persistent
   it('should warn and no-op if calling sendAccessibilityEvent on non native refs', async () => {
     class BasicClass extends React.Component {
       render() {
@@ -396,6 +404,7 @@ describe('ReactFabric', () => {
     expect(nativeFabricUIManager.sendAccessibilityEvent).not.toBeCalled();
   });
 
+  // @gate persistent
   it('returns the correct instance and calls it in the callback', () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -417,6 +426,7 @@ describe('ReactFabric', () => {
     expect(a).toBe(c);
   });
 
+  // @gate persistent
   it('renders and reorders children', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {title: true},
@@ -425,6 +435,7 @@ describe('ReactFabric', () => {
 
     class Component extends React.Component {
       render() {
+        // @gate persistent
         const chars = this.props.chars.split('');
         return (
           <View>
@@ -443,18 +454,57 @@ describe('ReactFabric', () => {
     await act(() => {
       ReactFabric.render(<Component chars={before} />, 11);
     });
-    expect(
-      nativeFabricUIManager.__dumpHierarchyForJestTestsOnly(),
-    ).toMatchSnapshot();
+    expect(nativeFabricUIManager.__dumpHierarchyForJestTestsOnly()).toBe(`11
+ RCTView null
+   RCTView {"title":"a"}
+   RCTView {"title":"b"}
+   RCTView {"title":"c"}
+   RCTView {"title":"d"}
+   RCTView {"title":"e"}
+   RCTView {"title":"f"}
+   RCTView {"title":"g"}
+   RCTView {"title":"h"}
+   RCTView {"title":"i"}
+   RCTView {"title":"j"}
+   RCTView {"title":"k"}
+   RCTView {"title":"l"}
+   RCTView {"title":"m"}
+   RCTView {"title":"n"}
+   RCTView {"title":"o"}
+   RCTView {"title":"p"}
+   RCTView {"title":"q"}
+   RCTView {"title":"r"}
+   RCTView {"title":"s"}
+   RCTView {"title":"t"}`);
 
     await act(() => {
       ReactFabric.render(<Component chars={after} />, 11);
     });
-    expect(
-      nativeFabricUIManager.__dumpHierarchyForJestTestsOnly(),
-    ).toMatchSnapshot();
+    expect(nativeFabricUIManager.__dumpHierarchyForJestTestsOnly()).toBe(`11
+ RCTView null
+   RCTView {"title":"m"}
+   RCTView {"title":"x"}
+   RCTView {"title":"h"}
+   RCTView {"title":"p"}
+   RCTView {"title":"g"}
+   RCTView {"title":"w"}
+   RCTView {"title":"f"}
+   RCTView {"title":"r"}
+   RCTView {"title":"a"}
+   RCTView {"title":"l"}
+   RCTView {"title":"k"}
+   RCTView {"title":"e"}
+   RCTView {"title":"o"}
+   RCTView {"title":"i"}
+   RCTView {"title":"v"}
+   RCTView {"title":"c"}
+   RCTView {"title":"s"}
+   RCTView {"title":"t"}
+   RCTView {"title":"z"}
+   RCTView {"title":"y"}`);
   });
 
+  // @gate persistent
   it('recreates host parents even if only children changed', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {title: true},
@@ -469,6 +519,7 @@ describe('ReactFabric', () => {
         chars: before,
       };
       render() {
+        // @gate persistent
         const chars = this.state.chars.split('');
         return (
           <View>
@@ -490,20 +541,63 @@ describe('ReactFabric', () => {
         11,
       );
     });
-    expect(
-      nativeFabricUIManager.__dumpHierarchyForJestTestsOnly(),
-    ).toMatchSnapshot();
+    expect(nativeFabricUIManager.__dumpHierarchyForJestTestsOnly()).toBe(
+      `11
+ RCTView null
+   RCTView null
+     RCTView {"title":"a"}
+     RCTView {"title":"b"}
+     RCTView {"title":"c"}
+     RCTView {"title":"d"}
+     RCTView {"title":"e"}
+     RCTView {"title":"f"}
+     RCTView {"title":"g"}
+     RCTView {"title":"h"}
+     RCTView {"title":"i"}
+     RCTView {"title":"j"}
+     RCTView {"title":"k"}
+     RCTView {"title":"l"}
+     RCTView {"title":"m"}
+     RCTView {"title":"n"}
+     RCTView {"title":"o"}
+     RCTView {"title":"p"}
+     RCTView {"title":"q"}
+     RCTView {"title":"r"}
+     RCTView {"title":"s"}
+     RCTView {"title":"t"}`,
+    );
 
     // Call setState() so that we skip over the top-level host node.
     // It should still get recreated despite a bailout.
     ref.current.setState({
       chars: after,
     });
-    expect(
-      nativeFabricUIManager.__dumpHierarchyForJestTestsOnly(),
-    ).toMatchSnapshot();
+    expect(nativeFabricUIManager.__dumpHierarchyForJestTestsOnly()).toBe(`11
+ RCTView null
+   RCTView null
+     RCTView {"title":"m"}
+     RCTView {"title":"x"}
+     RCTView {"title":"h"}
+     RCTView {"title":"p"}
+     RCTView {"title":"g"}
+     RCTView {"title":"w"}
+     RCTView {"title":"f"}
+     RCTView {"title":"r"}
+     RCTView {"title":"a"}
+     RCTView {"title":"l"}
+     RCTView {"title":"k"}
+     RCTView {"title":"e"}
+     RCTView {"title":"o"}
+     RCTView {"title":"i"}
+     RCTView {"title":"v"}
+     RCTView {"title":"c"}
+     RCTView {"title":"s"}
+     RCTView {"title":"t"}
+     RCTView {"title":"z"}
+     RCTView {"title":"y"}`);
   });
 
+  // @gate persistent
   it('calls setState with no arguments', async () => {
     let mockArgs;
     class Component extends React.Component {
@@ -521,6 +615,7 @@ describe('ReactFabric', () => {
     expect(mockArgs.length).toEqual(0);
   });
 
+  // @gate persistent
   it('should call complete after inserting children', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -544,9 +639,13 @@ describe('ReactFabric', () => {
         22,
       );
     });
-    expect(snapshots).toMatchSnapshot();
+    expect(snapshots).toEqual([
+      `RCTView {"foo":"a"}
+  RCTView {"foo":"b"}`,
+    ]);
   });
 
+  // @gate persistent
   it('should not throw when <View> is used inside of a <Text> ancestor', async () => {
     const Image = createReactNativeComponentClass('RCTImage', () => ({
       validAttributes: {},
@@ -580,6 +679,7 @@ describe('ReactFabric', () => {
     });
   });
 
+  // @gate persistent
   it('should console error for text not inside of a <Text> ancestor', async () => {
     const ScrollView = createReactNativeComponentClass('RCTScrollView', () => ({
       validAttributes: {},
@@ -612,6 +712,7 @@ describe('ReactFabric', () => {
     }).toErrorDev(['Text strings must be rendered within a <Text> component.']);
   });
 
+  // @gate persistent
   it('should not throw for text inside of an indirect <Text> ancestor', async () => {
     const Text = createReactNativeComponentClass('RCTText', () => ({
       validAttributes: {},
@@ -630,6 +731,7 @@ describe('ReactFabric', () => {
     });
   });
 
+  // @gate persistent
   it('dispatches events to the last committed props', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {},
@@ -684,6 +786,7 @@ describe('ReactFabric', () => {
   });
 
   describe('skipBubbling', () => {
+    // @gate persistent
     it('should skip bubbling to ancestor if specified', async () => {
       const View = createReactNativeComponentClass('RCTView', () => ({
         validAttributes: {},
@@ -777,6 +880,7 @@ describe('ReactFabric', () => {
     });
   });
 
+  // @gate persistent
   it('dispatches event with target as instance', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {
@@ -868,6 +972,7 @@ describe('ReactFabric', () => {
     expect.assertions(6);
   });
 
+  // @gate persistent
   it('findHostInstance_DEPRECATED should warn if used to find a host component inside StrictMode', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -909,6 +1014,7 @@ describe('ReactFabric', () => {
     expect(match).toBe(child);
   });
 
+  // @gate persistent
   it('findHostInstance_DEPRECATED should warn if passed a component that is inside StrictMode', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -948,6 +1054,7 @@ describe('ReactFabric', () => {
     expect(match).toBe(child);
   });
 
+  // @gate persistent
   it('findNodeHandle should warn if used to find a host component inside StrictMode', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -989,6 +1096,7 @@ describe('ReactFabric', () => {
     );
   });
 
+  // @gate persistent
   it('findNodeHandle should warn if passed a component that is inside StrictMode', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -1028,6 +1136,7 @@ describe('ReactFabric', () => {
     );
   });
 
+  // @gate persistent
   it('should no-op if calling sendAccessibilityEvent on unmounted refs', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -1060,6 +1169,7 @@ describe('ReactFabric', () => {
     expect(nativeFabricUIManager.sendAccessibilityEvent).not.toBeCalled();
   });
 
+  // @gate persistent
   it('getNodeFromInternalInstanceHandle should return the correct shadow node', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -1084,6 +1194,7 @@ describe('ReactFabric', () => {
     expect(node).toBe(expectedShadowNode);
   });
 
+  // @gate persistent
   it('getPublicInstanceFromInternalInstanceHandle should provide public instances for HostComponent', async () => {
     const View = createReactNativeComponentClass('RCTView', () => ({
       validAttributes: {foo: true},
@@ -1124,6 +1235,7 @@ describe('ReactFabric', () => {
     expect(publicInstanceAfterUnmount).toBe(null);
   });
 
+  // @gate persistent
   it('getPublicInstanceFromInternalInstanceHandle should provide public instances for HostText', async () => {
     jest.spyOn(ReactNativePrivateInterface, 'createPublicTextInstance');
 
