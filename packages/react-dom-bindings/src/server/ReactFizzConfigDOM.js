@@ -6071,6 +6071,7 @@ function getPreloadAsHeader(
   let value = `<${escapedHref}>; rel=preload; as="${escapedAs}"`;
   for (const paramName in params) {
     if (hasOwnProperty.call(params, paramName)) {
+      // $FlowFixMe[invalid-computed-prop]
       const paramValue = params[paramName];
       if (typeof paramValue === 'string') {
         value += `; ${paramName.toLowerCase()}="${escapeStringForLinkHeaderQuotedParamValueContext(
