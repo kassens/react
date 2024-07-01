@@ -7,4 +7,5 @@
  * @flow
  */
 
-export * from './src/ReactHTMLClient';
+// eslint-disable-next-line react-internal/prod-error-codes
+throw new Error('react-html should not get built in stable');
