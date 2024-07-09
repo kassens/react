@@ -403,6 +403,22 @@ function checkClassInstance(instance: any, ctor: any, newProps: any) {
           name,
         );
       }
+      if (ctor.childContextTypes && !didWarnAboutChildContextTypes.has(ctor)) {
+        didWarnAboutChildContextTypes.add(ctor);
+        console.error(
+          '%s uses the legacy childContextTypes API which will soon be removed. ' +
+            'Use React.createContext() instead.',
+          name,
+        );
+      }
+      if (ctor.contextTypes && !didWarnAboutContextTypes.has(ctor)) {
+        didWarnAboutContextTypes.add(ctor);
+        console.error(
+          '%s uses the legacy contextTypes API which will soon be removed. ' +
+            'Use React.createContext() with static contextType instead.',
+          name,
+        );
+      }
     }
 
     if (typeof instance.componentShouldUpdate === 'function') {
