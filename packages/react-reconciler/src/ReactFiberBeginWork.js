@@ -1130,12 +1130,20 @@ function updateFunctionComponent(
       // in updateFuntionComponent but only on mount
       validateFunctionComponentInDev(workInProgress, workInProgress.type);
 
-      if (disableLegacyContext && Component.contextTypes) {
-        console.error(
-          '%s uses the legacy contextTypes API which was removed in React 19. ' +
-            'Use React.createContext() with React.useContext() instead.',
-          getComponentNameFromType(Component) || 'Unknown',
-        );
+      if (Component.contextTypes) {
+        if (disableLegacyContext) {
+          console.error(
+            '%s uses the legacy contextTypes API which was removed in React 19. ' +
+              'Use React.createContext() with React.useContext() instead.',
+            getComponentNameFromType(Component) || 'Unknown',
+          );
+        } else {
+          console.error(
+            '%s uses the legacy contextTypes API which will be removed soon. ' +
+              'Use React.createContext() with React.useContext() instead.',
+            getComponentNameFromType(Component) || 'Unknown',
+          );
+        }
       }
     }
   }
