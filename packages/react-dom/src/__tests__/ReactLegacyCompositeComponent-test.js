@@ -14,7 +14,9 @@ let ReactDOM;
 let findDOMNode;
 let ReactDOMClient;
 let PropTypes;
+
 let act;
+let assertConsoleErrorDev;
 
 describe('ReactLegacyCompositeComponent', () => {
   beforeEach(() => {
@@ -26,7 +28,7 @@ describe('ReactLegacyCompositeComponent', () => {
       ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE
         .findDOMNode;
     PropTypes = require('prop-types');
-    act = require('internal-test-utils').act;
+    ({act, assertConsoleErrorDev} = require('internal-test-utils'));
   });
 
   // @gate !disableLegacyMode
@@ -119,6 +121,10 @@ describe('ReactLegacyCompositeComponent', () => {
     await act(() => {
       root.render(<Parent ref={current => (component = current)} />);
     });
+    assertConsoleErrorDev([
+      'Child uses the legacy childContextTypes API which will soon be removed. Use React.createContext() instead.',
+      'Grandchild uses the legacy contextTypes API which will soon be removed. Use React.createContext() with static contextType instead.',
+    ]);
     expect(findDOMNode(component).innerHTML).toBe('bar');
   });
 
@@ -183,6 +189,11 @@ describe('ReactLegacyCompositeComponent', () => {
     expect(parentInstance.state.flag).toBe(false);
     expect(childInstance.context).toEqual({foo: 'bar', flag: false});
 
+    assertConsoleErrorDev([
+      'Parent uses the legacy childContextTypes API which will soon be removed. Use React.createContext() instead.',
+      'Child uses the legacy contextTypes API which will soon be removed. Use React.createContext() with static contextType instead.',
+    ]);
+
     await act(() => {
       parentInstance.setState({flag: true});
     });
@@ -241,6 +252,11 @@ describe('ReactLegacyCompositeComponent', () => {
     await act(() => {
       root.render(<Wrapper ref={current => (wrapper = current)} />);
     });
+
+    assertConsoleErrorDev([
+      'Parent uses the legacy childContextTypes API which will soon be removed. Use React.createContext() instead.',
+      'Child uses the legacy contextTypes API which will soon be removed. Use React.createContext() with static contextType instead.',
+    ]);
 
     expect(wrapper.parentRef.current.state.flag).toEqual(true);
     expect(wrapper.childRef.current.context).toEqual({flag: true});
@@ -317,6 +333,13 @@ describe('ReactLegacyCompositeComponent', () => {
       root.render(<Parent />);
     });
 
+    assertConsoleErrorDev([
+      'Parent uses the legacy childContextTypes API which will soon be removed. Use React.createContext() instead.',
+      'Child uses the legacy childContextTypes API which will soon be removed. Use React.createContext() instead.',
+      'Child uses the legacy contextTypes API which will soon be removed. Use React.createContext() with static contextType instead.',
+      'Grandchild uses the legacy contextTypes API which will soon be removed. Use React.createContext() with static contextType instead.',
+    ]);
+
     expect(childInstance.context).toEqual({foo: 'bar', depth: 0});
     expect(grandchildInstance.context).toEqual({foo: 'bar', depth: 1});
   });
@@ -369,6 +392,9 @@ describe('ReactLegacyCompositeComponent', () => {
     await act(() => {
       root.render(<Parent ref={current => (parentInstance = current)} />);
     });
+    assertConsoleErrorDev([
+      'Parent uses the legacy childContextTypes API which will soon be removed. Use React.createContext() instead.',
+    ]);
 
     expect(childInstance).toBeNull();
 
@@ -376,6 +402,10 @@ describe('ReactLegacyCompositeComponent', () => {
     await act(() => {
       parentInstance.setState({flag: true});
     });
+    assertConsoleErrorDev([
+      'Child uses the legacy contextTypes API which will soon be removed. Use React.createContext() with static contextType instead.',
+    ]);
+
     expect(parentInstance.state.flag).toBe(true);
 
     expect(childInstance.context).toEqual({foo: 'bar', depth: 0});
