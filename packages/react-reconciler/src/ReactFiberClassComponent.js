@@ -393,7 +393,7 @@ function checkClassInstance(workInProgress: Fiber, ctor: any, newProps: any) {
         didWarnAboutChildContextTypes.add(ctor);
         console.error(
           '%s uses the legacy childContextTypes API which was removed in React 19. ' +
-            'Use React.createContext() instead.',
+            'Use React.createContext() instead. (https://react.dev/link/legacy-context)',
           name,
         );
       }
