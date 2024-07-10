@@ -465,7 +465,12 @@ describe('ReactLegacyCompositeComponent', () => {
     }
 
     const div = document.createElement('div');
-    ReactDOM.render(<Parent cntxt="noise" />, div);
+    expect(() => {
+      ReactDOM.render(<Parent cntxt="noise" />, div);
+    }).toErrorDev([
+      'Parent uses the legacy childContextTypes API which will soon be removed. Use React.createContext() instead.',
+      'Leaf uses the legacy contextTypes API which will soon be removed. Use React.createContext() with static contextType instead.',
+    ]);
     expect(div.children[0].innerHTML).toBe('noise');
     div.children[0].innerHTML = 'aliens';
     div.children[0].id = 'aliens';
@@ -567,20 +572,26 @@ describe('ReactLegacyCompositeComponent', () => {
     const div = document.createElement('div');
 
     let parentInstance = null;
-    ReactDOM.render(
-      <Parent ref={inst => (parentInstance = inst)}>
-        <ChildWithoutContext>
-          A1
-          <GrandChild>A2</GrandChild>
-        </ChildWithoutContext>
+    expect(() => {
+      ReactDOM.render(
+        <Parent ref={inst => (parentInstance = inst)}>
+          <ChildWithoutContext>
+            A1
+            <GrandChild>A2</GrandChild>
+          </ChildWithoutContext>
 
-        <ChildWithContext>
-          B1
-          <GrandChild>B2</GrandChild>
-        </ChildWithContext>
-      </Parent>,
-      div,
-    );
+          <ChildWithContext>
+            B1
+            <GrandChild>B2</GrandChild>
+          </ChildWithContext>
+        </Parent>,
+        div,
+      );
+    }).toErrorDev([
+      'Parent uses the legacy childContextTypes API which will soon be removed. Use React.createContext() instead.',
+      'GrandChild uses the legacy contextTypes API which will soon be removed. Use React.createContext() with static contextType instead.',
+      'ChildWithContext uses the legacy contextTypes API which will soon be removed. Use React.createContext() with static contextType instead.',
+    ]);
 
     parentInstance.setState({
       foo: 'def',
@@ -763,12 +774,17 @@ describe('ReactLegacyCompositeComponent', () => {
     }
 
     const div = document.createElement('div');
-    ReactDOM.render(
-      <Parent>
-        <Component />
-      </Parent>,
-      div,
-    );
+    expect(() => {
+      ReactDOM.render(
+        <Parent>
+          <Component />
+        </Parent>,
+        div,
+      );
+    }).toErrorDev([
+      'Parent uses the legacy childContextTypes API which will soon be removed. Use React.createContext() instead.',
+      'Component uses the legacy contextTypes API which will soon be removed. Use React.createContext() with static contextType instead.',
+    ]);
   });
 
   it('should replace state in legacy mode', async () => {
