@@ -298,9 +298,12 @@ function createFiberImplObject(
   if (__DEV__) {
     fiber._debugInfo = null;
     fiber._debugOwner = null;
+    if (enableOwnerStacks) {
+      this._debugStack = null;
+      this._debugTask = null;
+    }
     fiber._debugNeedsRemount = false;
     fiber._debugHookTypes = null;
-
     if (!hasBadMapPolyfill && typeof Object.preventExtensions === 'function') {
       Object.preventExtensions(fiber);
     }
