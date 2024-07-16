@@ -20,7 +20,6 @@ import isValidElementType from 'shared/isValidElementType';
 import isArray from 'shared/isArray';
 import {describeUnknownElementTypeFrameInDEV} from 'shared/ReactComponentStackFrame';
 import {
-  enableRefAsProp,
   disableStringRefs,
   disableDefaultPropsExceptForClasses,
   enableFastJSX,
@@ -72,7 +71,6 @@ function getOwner() {
 }
 
 let specialPropKeyWarningShown;
-let specialPropRefWarningShown;
 let didWarnAboutStringRefs;
 let didWarnAboutElementRef;
 let didWarnAboutOldJSXRuntime;
@@ -82,7 +80,7 @@ if (__DEV__) {
   didWarnAboutElementRef = {};
 }
 
-const enableFastJSXWithStringRefs = enableFastJSX && enableRefAsProp;
+const enableFastJSXWithStringRefs = enableFastJSX;
 const enableFastJSXWithoutStringRefs =
   enableFastJSXWithStringRefs && disableStringRefs;
 
@@ -161,30 +159,6 @@ function defineKeyPropWarningGetter(props, displayName) {
   }
 }
 
-function defineRefPropWarningGetter(props, displayName) {
-  if (!enableRefAsProp) {
-    if (__DEV__) {
-      const warnAboutAccessingRef = function () {
-        if (!specialPropRefWarningShown) {
-          specialPropRefWarningShown = true;
-          console.error(
-            '%s: `ref` is not a prop. Trying to access it will result ' +
-              'in `undefined` being returned. If you need to access the same ' +
-              'value within the child component, you should pass it as a different ' +
-              'prop. (https://react.dev/link/special-props)',
-            displayName,
-          );
-        }
-      };
-      warnAboutAccessingRef.isReactWarning = true;
-      Object.defineProperty(props, 'ref', {
-        get: warnAboutAccessingRef,
-        configurable: true,
-      });
-    }
-  }
-}
-
 function elementRefGetterWithDeprecationWarning() {
   if (__DEV__) {
     const componentName = getComponentNameFromType(this.type);
@@ -227,7 +201,6 @@ function elementRefGetterWithDeprecationWarning() {
 function ReactElement(
   type,
   key,
-  _ref,
   self,
   source,
   owner,
@@ -235,24 +208,18 @@ function ReactElement(
   debugStack,
   debugTask,
 ) {
-  let ref;
-  if (enableRefAsProp) {
-    // When enableRefAsProp is on, ignore whatever was passed as the ref
-    // argument and treat `props.ref` as the source of truth. The only thing we
-    // use this for is `element.ref`, which will log a deprecation warning on
-    // access. In the next release, we can remove `element.ref` as well as the
-    // `ref` argument.
-    const refProp = props.ref;
+  // When enableRefAsProp is on, ignore whatever was passed as the ref
+  // argument and treat `props.ref` as the source of truth. The only thing we
+  // use this for is `element.ref`, which will log a deprecation warning on
+  // access. In the next release, we can remove `element.ref` as well as the
+  // `ref` argument.
+  const refProp = props.ref;
 
-    // An undefined `element.ref` is coerced to `null` for
-    // backwards compatibility.
-    ref = refProp !== undefined ? refProp : null;
-  } else {
-    ref = _ref;
-  }
-
+  // An undefined `element.ref` is coerced to `null` for
+  // backwards compatibility.
+  const ref = refProp !== undefined ? refProp : null;
   let element;
-  if (__DEV__ && enableRefAsProp) {
+  if (__DEV__) {
     // In dev, make `ref` a non-enumerable property with a warning. It's non-
     // enumerable so that test matchers and serializers don't access it and
     // trigger the warning.
@@ -382,7 +349,6 @@ function ReactElement(
  */
 export function jsxProd(type, config, maybeKey) {
   let key = null;
-  let ref = null;
 
   // Currently, key can be spread in as a prop. This causes a potential
   // issue if key is also explicitly declared (ie. <div {...props} key="Hi" />
@@ -402,15 +368,6 @@ export function jsxProd(type, config, maybeKey) {
       checkKeyStringCoercion(config.key);
     }
     key = '' + config.key;
-  }
-
-  if (hasValidRef(config)) {
-    if (!enableRefAsProp) {
-      ref = config.ref;
-      if (!disableStringRefs) {
-        ref = coerceStringRef(ref, getOwner(), type);
-      }
-    }
   }
 
   let props;
@@ -436,8 +393,8 @@ export function jsxProd(type, config, maybeKey) {
     props = {};
     for (const propName in config) {
       // Skip over reserved prop names
-      if (propName !== 'key' && (enableRefAsProp || propName !== 'ref')) {
-        if (enableRefAsProp && !disableStringRefs && propName === 'ref') {
+      if (propName !== 'key' && (true || propName !== 'ref')) {
+        if (!disableStringRefs && propName === 'ref') {
           props.ref = coerceStringRef(config[propName], getOwner(), type);
         } else {
           props[propName] = config[propName];
@@ -461,7 +418,6 @@ export function jsxProd(type, config, maybeKey) {
   return ReactElement(
     type,
     key,
-    ref,
     undefined,
     undefined,
     getOwner(),
@@ -664,7 +620,6 @@ function jsxDEVImpl(
     }
 
     let key = null;
-    let ref = null;
 
     // Currently, key can be spread in as a prop. This causes a potential
     // issue if key is also explicitly declared (ie. <div {...props} key="Hi" />
@@ -687,12 +642,6 @@ function jsxDEVImpl(
     }
 
     if (hasValidRef(config)) {
-      if (!enableRefAsProp) {
-        ref = config.ref;
-        if (!disableStringRefs) {
-          ref = coerceStringRef(ref, getOwner(), type);
-        }
-      }
       if (!disableStringRefs) {
         warnIfStringRefCannotBeAutoConverted(config, self);
       }
@@ -721,8 +670,8 @@ function jsxDEVImpl(
       props = {};
       for (const propName in config) {
         // Skip over reserved prop names
-        if (propName !== 'key' && (enableRefAsProp || propName !== 'ref')) {
-          if (enableRefAsProp && !disableStringRefs && propName === 'ref') {
+        if (propName !== 'key' && (true || propName !== 'ref')) {
+          if (!disableStringRefs && propName === 'ref') {
             props.ref = coerceStringRef(config[propName], getOwner(), type);
           } else {
             props[propName] = config[propName];
@@ -743,7 +692,7 @@ function jsxDEVImpl(
       }
     }
 
-    if (key || (!enableRefAsProp && ref)) {
+    if (key) {
       const displayName =
         typeof type === 'function'
           ? type.displayName || type.name || 'Unknown'
@@ -751,15 +700,11 @@ function jsxDEVImpl(
       if (key) {
         defineKeyPropWarningGetter(props, displayName);
       }
-      if (!enableRefAsProp && ref) {
-        defineRefPropWarningGetter(props, displayName);
-      }
     }
 
     return ReactElement(
       type,
       key,
-      ref,
       self,
       source,
       getOwner(),
@@ -840,7 +785,6 @@ export function createElement(type, config, children) {
   const props = {};
 
   let key = null;
-  let ref = null;
 
   if (config != null) {
     if (__DEV__) {
@@ -863,15 +807,8 @@ export function createElement(type, config, children) {
       }
     }
 
-    if (hasValidRef(config)) {
-      if (!enableRefAsProp) {
-        ref = config.ref;
-        if (!disableStringRefs) {
-          ref = coerceStringRef(ref, getOwner(), type);
-        }
-      }
-
-      if (__DEV__ && !disableStringRefs) {
+    if (__DEV__ && !disableStringRefs) {
+      if (hasValidRef(config)) {
         warnIfStringRefCannotBeAutoConverted(config, config.__self);
       }
     }
@@ -888,7 +825,6 @@ export function createElement(type, config, children) {
         hasOwnProperty.call(config, propName) &&
         // Skip over reserved prop names
         propName !== 'key' &&
-        (enableRefAsProp || propName !== 'ref') &&
         // Even though we don't use these anymore in the runtime, we don't want
         // them to appear as props, so in createElement we filter them out.
         // We don't have to do this in the jsx() runtime because the jsx()
@@ -896,7 +832,7 @@ export function createElement(type, config, children) {
         propName !== '__self' &&
         propName !== '__source'
       ) {
-        if (enableRefAsProp && !disableStringRefs && propName === 'ref') {
+        if (!disableStringRefs && propName === 'ref') {
           props.ref = coerceStringRef(config[propName], getOwner(), type);
         } else {
           props[propName] = config[propName];
@@ -933,7 +869,7 @@ export function createElement(type, config, children) {
     }
   }
   if (__DEV__) {
-    if (key || (!enableRefAsProp && ref)) {
+    if (key) {
       const displayName =
         typeof type === 'function'
           ? type.displayName || type.name || 'Unknown'
@@ -941,16 +877,12 @@ export function createElement(type, config, children) {
       if (key) {
         defineKeyPropWarningGetter(props, displayName);
       }
-      if (!enableRefAsProp && ref) {
-        defineRefPropWarningGetter(props, displayName);
-      }
     }
   }
 
   return ReactElement(
     type,
     key,
-    ref,
     undefined,
     undefined,
     getOwner(),
@@ -964,9 +896,6 @@ export function cloneAndReplaceKey(oldElement, newKey) {
   const clonedElement = ReactElement(
     oldElement.type,
     newKey,
-    // When enableRefAsProp is on, this argument is ignored. This check only
-    // exists to avoid the `ref` access warning.
-    enableRefAsProp ? null : oldElement.ref,
     undefined,
     undefined,
     !__DEV__ && disableStringRefs ? undefined : oldElement._owner,
@@ -999,7 +928,6 @@ export function cloneElement(element, config, children) {
 
   // Reserved names are extracted
   let key = element.key;
-  let ref = enableRefAsProp ? null : element.ref;
 
   // Owner will be preserved, unless ref is overridden
   let owner = !__DEV__ && disableStringRefs ? undefined : element._owner;
@@ -1007,13 +935,6 @@ export function cloneElement(element, config, children) {
   if (config != null) {
     if (hasValidRef(config)) {
       owner = __DEV__ || !disableStringRefs ? getOwner() : undefined;
-      if (!enableRefAsProp) {
-        // Silently steal the ref from the parent.
-        ref = config.ref;
-        if (!disableStringRefs) {
-          ref = coerceStringRef(ref, owner, element.type);
-        }
-      }
     }
     if (hasValidKey(config)) {
       if (__DEV__) {
@@ -1036,7 +957,6 @@ export function cloneElement(element, config, children) {
         hasOwnProperty.call(config, propName) &&
         // Skip over reserved prop names
         propName !== 'key' &&
-        (enableRefAsProp || propName !== 'ref') &&
         // ...and maybe these, too, though we currently rely on them for
         // warnings and debug information in dev. Need to decide if we're OK
         // with dropping them. In the jsx() runtime it's not an issue because
@@ -1048,7 +968,7 @@ export function cloneElement(element, config, children) {
         // Undefined `ref` is ignored by cloneElement. We treat it the same as
         // if the property were missing. This is mostly for
         // backwards compatibility.
-        !(enableRefAsProp && propName === 'ref' && config.ref === undefined)
+        !(propName === 'ref' && config.ref === undefined)
       ) {
         if (
           !disableDefaultPropsExceptForClasses &&
@@ -1058,7 +978,7 @@ export function cloneElement(element, config, children) {
           // Resolve default props
           props[propName] = defaultProps[propName];
         } else {
-          if (enableRefAsProp && !disableStringRefs && propName === 'ref') {
+          if (!disableStringRefs && propName === 'ref') {
             props.ref = coerceStringRef(config[propName], owner, element.type);
           } else {
             props[propName] = config[propName];
@@ -1084,7 +1004,6 @@ export function cloneElement(element, config, children) {
   const clonedElement = ReactElement(
     element.type,
     key,
-    ref,
     undefined,
     undefined,
     owner,

@@ -244,7 +244,7 @@ describe('ReactJSXRuntime', () => {
     );
   });
 
-  // @gate !enableRefAsProp || !__DEV__
+  // @gate !__DEV__
   it('should warn when `ref` is being accessed', async () => {
     const container = document.createElement('div');
     class Child extends React.Component {
@@ -377,7 +377,7 @@ describe('ReactJSXRuntime', () => {
     expect(didCall).toBe(false);
   });
 
-  // @gate enableFastJSX && enableRefAsProp
+  // @gate enableFastJSX
   it('does not clone props object if key and ref is not spread', async () => {
     const config = {
       foo: 'foo',

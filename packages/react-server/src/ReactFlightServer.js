@@ -17,7 +17,6 @@ import {
   enableBinaryFlight,
   enablePostpone,
   enableTaint,
-  enableRefAsProp,
   enableServerComponentLogs,
   enableOwnerStacks,
 } from 'shared/ReactFeatureFlags';
@@ -2312,17 +2311,11 @@ function renderModelDestructive(
         }
 
         const props = element.props;
-        let ref;
-        if (enableRefAsProp) {
-          // TODO: This is a temporary, intermediate step. Once the feature
-          // flag is removed, we should get the ref off the props object right
-          // before using it.
-          const refProp = props.ref;
-          ref = refProp !== undefined ? refProp : null;
-        } else {
-          ref = element.ref;
-        }
-
+        // TODO: This is a temporary, intermediate step. Once the feature
+        // flag is removed, we should get the ref off the props object right
+        // before using it.
+        const refProp = props.ref;
+        const ref = refProp !== undefined ? refProp : null;
         // Attempt to render the Server Component.
 
         if (__DEV__) {

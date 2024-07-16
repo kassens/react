@@ -873,7 +873,7 @@ describe('Store (legacy)', () => {
     // is not compatible with older versions of React. Need to configure the
     // the test environment in such a way that certain test modules like this
     // one can use an older transform.
-    if (!require('shared/ReactFeatureFlags').enableRefAsProp) {
+    if (false) {
       it('should support expanding deep parts of the tree', () => {
         const Wrapper = ({forwardedRef}) =>
           React.createElement(Nested, {
