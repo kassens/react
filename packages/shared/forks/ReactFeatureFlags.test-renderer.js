@@ -87,7 +87,6 @@ export const enableShallowPropDiffing = false;
 // We really need to get rid of this whole module. Any test renderer specific
 // flags should be handled by the Fiber config.
 // const __NEXT_MAJOR__ = __EXPERIMENTAL__;
-export const enableRefAsProp = true;
 export const disableStringRefs = true;
 export const enableFastJSX = true;
 export const disableLegacyMode = true;
