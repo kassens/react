@@ -193,7 +193,6 @@ export const enableInfiniteRenderLoopDetection = true;
 
 // Passes `ref` as a normal prop instead of stripping it from the props object
 // during element creation.
-export const enableRefAsProp = true;
 export const disableStringRefs = true;
 export const enableFastJSX = true;
 

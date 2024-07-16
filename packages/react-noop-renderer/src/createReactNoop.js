@@ -35,11 +35,7 @@ import {
   ConcurrentRoot,
   LegacyRoot,
 } from 'react-reconciler/constants';
-import {
-  enableRefAsProp,
-  disableLegacyMode,
-  disableStringRefs,
-} from 'shared/ReactFeatureFlags';
+import {disableLegacyMode, disableStringRefs} from 'shared/ReactFeatureFlags';
 
 import ReactSharedInternals from 'shared/ReactSharedInternals';
 
@@ -816,7 +812,7 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
   let currentEventPriority = DefaultEventPriority;
 
   function createJSXElementForTestComparison(type, props) {
-    if (__DEV__ && enableRefAsProp) {
+    if (__DEV__) {
       const element = {
         type: type,
         $$typeof: REACT_ELEMENT_TYPE,

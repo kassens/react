@@ -41,7 +41,6 @@ import {
   disableStringRefs,
   enableBinaryFlight,
   enablePostpone,
-  enableRefAsProp,
   enableFlightReadableStream,
   enableOwnerStacks,
 } from 'shared/ReactFeatureFlags';
@@ -630,7 +629,7 @@ function createElement(
   | React$Element<any>
   | LazyComponent<React$Element<any>, SomeChunk<React$Element<any>>> {
   let element: any;
-  if (__DEV__ && enableRefAsProp) {
+  if (__DEV__) {
     // `ref` is non-enumerable in dev
     element = ({
       $$typeof: REACT_ELEMENT_TYPE,
