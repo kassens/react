@@ -79,7 +79,6 @@ export const disableClientCache = true;
 export const enableServerComponentLogs = true;
 export const enableInfiniteRenderLoopDetection = false;
 
-export const enableRefAsProp = true;
 export const disableStringRefs = false;
 export const enableFastJSX = false;
 
