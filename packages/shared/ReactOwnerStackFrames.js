@@ -7,20 +7,7 @@
  * @flow
  */
 
-// This is a DevTools fork of ReactFiberOwnerStack.
-
-// TODO: Make this configurable?
-const externalRegExp = /\/node\_modules\/|\(\<anonymous\>/;
-
-function isNotExternal(stackFrame: string): boolean {
-  return !externalRegExp.test(stackFrame);
-}
-
-function filterDebugStack(error: Error): string {
-  // Since stacks can be quite large and we pass a lot of them, we filter them out eagerly
-  // to save bandwidth even in DEV. We'll also replay these stacks on the client so by
-  // stripping them early we avoid that overhead. Otherwise we'd normally just rely on
-  // the DevTools or framework's ignore lists to filter them out.
+export function formatOwnerStack(error: Error): string {
   const prevPrepareStackTrace = Error.prepareStackTrace;
   // $FlowFixMe[incompatible-type] It does accept undefined.
   Error.prepareStackTrace = undefined;
@@ -31,7 +18,12 @@ function filterDebugStack(error: Error): string {
     // don't want/need.
     stack = stack.slice(29);
   }
-  let idx = stack.indexOf('react-stack-bottom-frame');
+  let idx = stack.indexOf('\n');
+  if (idx !== -1) {
+    // Pop the JSX frame.
+    stack = stack.slice(idx + 1);
+  }
+  idx = stack.indexOf('react-stack-bottom-frame');
   if (idx !== -1) {
     idx = stack.lastIndexOf('\n', idx);
   }
@@ -44,10 +36,5 @@ function filterDebugStack(error: Error): string {
     // To keep things light we exclude the entire trace in this case.
     return '';
   }
-  const frames = stack.split('\n').slice(1); // Pop the JSX frame.
-  return frames.filter(isNotExternal).join('\n');
-}
-
-export function formatOwnerStack(ownerStackTrace: Error): string {
-  return filterDebugStack(ownerStackTrace);
+  return stack;
 }

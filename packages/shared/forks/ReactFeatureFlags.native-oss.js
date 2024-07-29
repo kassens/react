@@ -19,7 +19,6 @@ export const debugRenderPhaseSideEffectsForStrictMode = __DEV__;
 // -----------------------------------------------------------------------------
 // All other flags
 // -----------------------------------------------------------------------------
-export const allowConcurrentByDefault = false;
 export const alwaysThrottleRetries = false;
 export const consoleManagedByDevToolsDuringStrictMode = true;
 export const disableClientCache = true;
@@ -51,6 +50,7 @@ export const enableFlightReadableStream = true;
 export const enableGetInspectorDataForInstanceInProduction = false;
 export const enableInfiniteRenderLoopDetection = true;
 export const enableLazyContextPropagation = false;
+export const enableContextProfiling = false;
 export const enableLegacyCache = false;
 export const enableLegacyFBSupport = false;
 export const enableLegacyHidden = false;

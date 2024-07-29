@@ -10,7 +10,6 @@
 import typeof * as FeatureFlagsType from 'shared/ReactFeatureFlags';
 import typeof * as ExportsType from './ReactFeatureFlags.test-renderer';
 
-export const allowConcurrentByDefault = true;
 export const alwaysThrottleRetries = false;
 export const consoleManagedByDevToolsDuringStrictMode = false;
 export const debugRenderPhaseSideEffectsForStrictMode = false;
@@ -43,6 +42,7 @@ export const enableFlightReadableStream = true;
 export const enableGetInspectorDataForInstanceInProduction = false;
 export const enableInfiniteRenderLoopDetection = true;
 export const enableLazyContextPropagation = false;
+export const enableContextProfiling = false;
 export const enableLegacyCache = false;
 export const enableLegacyFBSupport = false;
 export const enableLegacyHidden = false;

@@ -97,6 +97,9 @@ export const enableTransitionTracing = false;
 // No known bugs, but needs performance testing
 export const enableLazyContextPropagation = false;
 
+// Expose unstable useContext for performance testing
+export const enableContextProfiling = false;
+
 // FB-only usage. The new API has different semantics.
 export const enableLegacyHidden = false;
 
@@ -216,9 +219,6 @@ export const enableUseDeferredValueInitialArg = true;
 // Planned feature deprecations and breaking changes. Sorted roughly in order of
 // when we plan to enable them.
 // -----------------------------------------------------------------------------
-
-// Adds an opt-in to time slicing for updates that aren't wrapped in startTransition.
-export const allowConcurrentByDefault = false;
 
 // -----------------------------------------------------------------------------
 // React DOM Chopping Block

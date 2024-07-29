@@ -80,7 +80,7 @@ import {
   resetResumableState,
   completeResumableState,
   emitEarlyPreloads,
-  printToConsole,
+  bindToConsole,
 } from './ReactFizzConfig';
 import {
   constructClassInstance,
@@ -294,11 +294,12 @@ const FLUSHED = 2;
 const ABORTED = 3;
 const ERRORED = 4;
 const POSTPONED = 5;
+const RENDERING = 6;
 
 type Root = null;
 
 type Segment = {
-  status: 0 | 1 | 2 | 3 | 4 | 5,
+  status: 0 | 1 | 2 | 3 | 4 | 5 | 6,
   parentFlushed: boolean, // typically a segment will be flushed by its parent, except if its parent was already flushed
   id: number, // starts as 0 and is lazily assigned if the parent flushes early
   +index: number, // the index within the parent's chunks or 0 at the root
@@ -314,8 +315,9 @@ type Segment = {
 };
 
 const OPEN = 0;
-const CLOSING = 1;
-const CLOSED = 2;
+const ABORTING = 1;
+const CLOSING = 2;
+const CLOSED = 3;
 
 export opaque type Request = {
   destination: null | Destination,
@@ -324,7 +326,7 @@ export opaque type Request = {
   +renderState: RenderState,
   +rootFormatContext: FormatContext,
   +progressiveChunkSize: number,
-  status: 0 | 1 | 2,
+  status: 0 | 1 | 2 | 3,
   fatalError: mixed,
   nextSegmentId: number,
   allPendingTasks: number, // when it reaches zero, we can close the connection.
@@ -386,7 +388,7 @@ function defaultErrorHandler(error: mixed) {
   ) {
     // This was a Server error. We print the environment name in a badge just like we do with
     // replays of console logs to indicate that the source of this throw as actually the Server.
-    printToConsole('error', [error], error.environmentName);
+    bindToConsole('error', [error], error.environmentName)();
   } else {
     console['error'](error); // Don't transform to our wrapper
   }
@@ -649,6 +651,8 @@ export function resumeRequest(
   pingedTasks.push(rootTask);
   return request;
 }
+
+const AbortSigil = {};
 
 let currentRequest: null | Request = null;
 
@@ -1138,83 +1142,13 @@ function renderSuspenseBoundary(
   // no parent segment so there's nothing to wait on.
   contentRootSegment.parentFlushed = true;
 
-  // Currently this is running synchronously. We could instead schedule this to pingedTasks.
-  // I suspect that there might be some efficiency benefits from not creating the suspended task
-  // and instead just using the stack if possible.
-  // TODO: Call this directly instead of messing with saving and restoring contexts.
+  if (request.trackedPostpones !== null) {
+    // This is a prerender. In this mode we want to render the fallback synchronously and schedule
+    // the content to render later. This is the opposite of what we do during a normal render
+    // where we try to skip rendering the fallback if the content itself can render synchronously
+    const trackedPostpones = request.trackedPostpones;
 
-  // We can reuse the current context and task to render the content immediately without
-  // context switching. We just need to temporarily switch which boundary and which segment
-  // we're writing to. If something suspends, it'll spawn new suspended task with that context.
-  task.blockedBoundary = newBoundary;
-  task.hoistableState = newBoundary.contentState;
-  task.blockedSegment = contentRootSegment;
-  task.keyPath = keyPath;
-
-  try {
-    // We use the safe form because we don't handle suspending here. Only error handling.
-    renderNode(request, task, content, -1);
-    pushSegmentFinale(
-      contentRootSegment.chunks,
-      request.renderState,
-      contentRootSegment.lastPushedText,
-      contentRootSegment.textEmbedded,
-    );
-    contentRootSegment.status = COMPLETED;
-    queueCompletedSegment(newBoundary, contentRootSegment);
-    if (newBoundary.pendingTasks === 0 && newBoundary.status === PENDING) {
-      // This must have been the last segment we were waiting on. This boundary is now complete.
-      // Therefore we won't need the fallback. We early return so that we don't have to create
-      // the fallback.
-      newBoundary.status = COMPLETED;
-      return;
-    }
-  } catch (error: mixed) {
-    contentRootSegment.status = ERRORED;
-    newBoundary.status = CLIENT_RENDERED;
-    const thrownInfo = getThrownInfo(task.componentStack);
-    let errorDigest;
-    if (
-      enablePostpone &&
-      typeof error === 'object' &&
-      error !== null &&
-      error.$$typeof === REACT_POSTPONE_TYPE
-    ) {
-      const postponeInstance: Postpone = (error: any);
-      logPostpone(
-        request,
-        postponeInstance.message,
-        thrownInfo,
-        __DEV__ && enableOwnerStacks ? task.debugTask : null,
-      );
-      // TODO: Figure out a better signal than a magic digest value.
-      errorDigest = 'POSTPONE';
-    } else {
-      errorDigest = logRecoverableError(
-        request,
-        error,
-        thrownInfo,
-        __DEV__ && enableOwnerStacks ? task.debugTask : null,
-      );
-    }
-    encodeErrorForBoundary(newBoundary, errorDigest, error, thrownInfo, false);
-
-    untrackBoundary(request, newBoundary);
-
-    // We don't need to decrement any task numbers because we didn't spawn any new task.
-    // We don't need to schedule any task because we know the parent has written yet.
-    // We do need to fallthrough to create the fallback though.
-  } finally {
-    task.blockedBoundary = parentBoundary;
-    task.hoistableState = parentHoistableState;
-    task.blockedSegment = parentSegment;
-    task.keyPath = prevKeyPath;
-  }
-
-  const fallbackKeyPath = [keyPath[0], 'Suspense Fallback', keyPath[2]];
-  const trackedPostpones = request.trackedPostpones;
-  if (trackedPostpones !== null) {
-    // We create a detached replay node to track any postpones inside the fallback.
+    const fallbackKeyPath = [keyPath[0], 'Suspense Fallback', keyPath[2]];
     const fallbackReplayNode: ReplayNode = [
       fallbackKeyPath[1],
       fallbackKeyPath[2],
@@ -1222,41 +1156,175 @@ function renderSuspenseBoundary(
       null,
     ];
     trackedPostpones.workingMap.set(fallbackKeyPath, fallbackReplayNode);
-    if (newBoundary.status === POSTPONED) {
-      // This must exist now.
-      const boundaryReplayNode: ReplaySuspenseBoundary =
-        (trackedPostpones.workingMap.get(keyPath): any);
-      boundaryReplayNode[4] = fallbackReplayNode;
-    } else {
-      // We might not inject it into the postponed tree, unless the content actually
-      // postpones too. We need to keep track of it until that happpens.
-      newBoundary.trackedFallbackNode = fallbackReplayNode;
+    // We are rendering the fallback before the boundary content so we keep track of
+    // the fallback replay node until we determine if the primary content suspends
+    newBoundary.trackedFallbackNode = fallbackReplayNode;
+
+    task.blockedSegment = boundarySegment;
+    task.keyPath = fallbackKeyPath;
+    boundarySegment.status = RENDERING;
+    try {
+      renderNode(request, task, fallback, -1);
+      pushSegmentFinale(
+        boundarySegment.chunks,
+        request.renderState,
+        boundarySegment.lastPushedText,
+        boundarySegment.textEmbedded,
+      );
+      boundarySegment.status = COMPLETED;
+    } catch (thrownValue: mixed) {
+      if (thrownValue === AbortSigil) {
+        boundarySegment.status = ABORTED;
+      } else {
+        boundarySegment.status = ERRORED;
+      }
+      throw thrownValue;
+    } finally {
+      task.blockedSegment = parentSegment;
+      task.keyPath = prevKeyPath;
     }
+
+    // We create a suspended task for the primary content because we want to allow
+    // sibling fallbacks to be rendered first.
+    const suspendedPrimaryTask = createRenderTask(
+      request,
+      null,
+      content,
+      -1,
+      newBoundary,
+      contentRootSegment,
+      newBoundary.contentState,
+      task.abortSet,
+      keyPath,
+      task.formatContext,
+      task.context,
+      task.treeContext,
+      task.componentStack,
+      task.isFallback,
+      !disableLegacyContext ? task.legacyContext : emptyContextObject,
+      __DEV__ && enableOwnerStacks ? task.debugTask : null,
+    );
+    pushComponentStack(suspendedPrimaryTask);
+    request.pingedTasks.push(suspendedPrimaryTask);
+  } else {
+    // This is a normal render. We will attempt to synchronously render the boundary content
+    // If it is successful we will elide the fallback task but if it suspends or errors we schedule
+    // the fallback to render. Unlike with prerenders we attempt to deprioritize the fallback render
+
+    // Currently this is running synchronously. We could instead schedule this to pingedTasks.
+    // I suspect that there might be some efficiency benefits from not creating the suspended task
+    // and instead just using the stack if possible.
+    // TODO: Call this directly instead of messing with saving and restoring contexts.
+
+    // We can reuse the current context and task to render the content immediately without
+    // context switching. We just need to temporarily switch which boundary and which segment
+    // we're writing to. If something suspends, it'll spawn new suspended task with that context.
+    task.blockedBoundary = newBoundary;
+    task.hoistableState = newBoundary.contentState;
+    task.blockedSegment = contentRootSegment;
+    task.keyPath = keyPath;
+    contentRootSegment.status = RENDERING;
+
+    try {
+      // We use the safe form because we don't handle suspending here. Only error handling.
+      renderNode(request, task, content, -1);
+      pushSegmentFinale(
+        contentRootSegment.chunks,
+        request.renderState,
+        contentRootSegment.lastPushedText,
+        contentRootSegment.textEmbedded,
+      );
+      contentRootSegment.status = COMPLETED;
+      queueCompletedSegment(newBoundary, contentRootSegment);
+      if (newBoundary.pendingTasks === 0 && newBoundary.status === PENDING) {
+        // This must have been the last segment we were waiting on. This boundary is now complete.
+        // Therefore we won't need the fallback. We early return so that we don't have to create
+        // the fallback.
+        newBoundary.status = COMPLETED;
+        return;
+      }
+    } catch (thrownValue: mixed) {
+      newBoundary.status = CLIENT_RENDERED;
+      let error: mixed;
+      if (thrownValue === AbortSigil) {
+        contentRootSegment.status = ABORTED;
+        error = request.fatalError;
+      } else {
+        contentRootSegment.status = ERRORED;
+        error = thrownValue;
+      }
+
+      const thrownInfo = getThrownInfo(task.componentStack);
+      let errorDigest;
+      if (
+        enablePostpone &&
+        typeof error === 'object' &&
+        error !== null &&
+        error.$$typeof === REACT_POSTPONE_TYPE
+      ) {
+        const postponeInstance: Postpone = (error: any);
+        logPostpone(
+          request,
+          postponeInstance.message,
+          thrownInfo,
+          __DEV__ && enableOwnerStacks ? task.debugTask : null,
+        );
+        // TODO: Figure out a better signal than a magic digest value.
+        errorDigest = 'POSTPONE';
+      } else {
+        errorDigest = logRecoverableError(
+          request,
+          error,
+          thrownInfo,
+          __DEV__ && enableOwnerStacks ? task.debugTask : null,
+        );
+      }
+      encodeErrorForBoundary(
+        newBoundary,
+        errorDigest,
+        error,
+        thrownInfo,
+        false,
+      );
+
+      untrackBoundary(request, newBoundary);
+
+      // We don't need to decrement any task numbers because we didn't spawn any new task.
+      // We don't need to schedule any task because we know the parent has written yet.
+      // We do need to fallthrough to create the fallback though.
+    } finally {
+      task.blockedBoundary = parentBoundary;
+      task.hoistableState = parentHoistableState;
+      task.blockedSegment = parentSegment;
+      task.keyPath = prevKeyPath;
+    }
+
+    const fallbackKeyPath = [keyPath[0], 'Suspense Fallback', keyPath[2]];
+    // We create suspended task for the fallback because we don't want to actually work
+    // on it yet in case we finish the main content, so we queue for later.
+    const suspendedFallbackTask = createRenderTask(
+      request,
+      null,
+      fallback,
+      -1,
+      parentBoundary,
+      boundarySegment,
+      newBoundary.fallbackState,
+      fallbackAbortSet,
+      fallbackKeyPath,
+      task.formatContext,
+      task.context,
+      task.treeContext,
+      task.componentStack,
+      true,
+      !disableLegacyContext ? task.legacyContext : emptyContextObject,
+      __DEV__ && enableOwnerStacks ? task.debugTask : null,
+    );
+    pushComponentStack(suspendedFallbackTask);
+    // TODO: This should be queued at a separate lower priority queue so that we only work
+    // on preparing fallbacks if we don't have any more main content to task on.
+    request.pingedTasks.push(suspendedFallbackTask);
   }
-  // We create suspended task for the fallback because we don't want to actually work
-  // on it yet in case we finish the main content, so we queue for later.
-  const suspendedFallbackTask = createRenderTask(
-    request,
-    null,
-    fallback,
-    -1,
-    parentBoundary,
-    boundarySegment,
-    newBoundary.fallbackState,
-    fallbackAbortSet,
-    fallbackKeyPath,
-    task.formatContext,
-    task.context,
-    task.treeContext,
-    task.componentStack,
-    true,
-    !disableLegacyContext ? task.legacyContext : emptyContextObject,
-    __DEV__ && enableOwnerStacks ? task.debugTask : null,
-  );
-  pushComponentStack(suspendedFallbackTask);
-  // TODO: This should be queued at a separate lower priority queue so that we only work
-  // on preparing fallbacks if we don't have any more main content to task on.
-  request.pingedTasks.push(suspendedFallbackTask);
 }
 
 function replaySuspenseBoundary(
@@ -1532,6 +1600,9 @@ function finishClassComponent(
   } else {
     nextChildren = instance.render();
   }
+  if (request.status === ABORTING) {
+    throw AbortSigil;
+  }
 
   if (__DEV__) {
     if (instance.props !== props) {
@@ -1685,6 +1756,10 @@ function renderFunctionComponent(
     props,
     legacyContext,
   );
+  if (request.status === ABORTING) {
+    throw AbortSigil;
+  }
+
   const hasId = checkDidRenderIdHook();
   const actionStateCount = getActionStateCount();
   const actionStateMatchingIndex = getActionStateMatchingIndex();
@@ -1999,6 +2074,9 @@ function renderLazyComponent(
     const payload = lazyComponent._payload;
     const init = lazyComponent._init;
     Component = init(payload);
+  }
+  if (request.status === ABORTING) {
+    throw AbortSigil;
   }
   const resolvedProps = resolveDefaultPropsOnNonClassComponent(
     Component,
@@ -2575,6 +2653,9 @@ function retryNode(request: Request, task: Task): void {
           const payload = lazyNode._payload;
           const init = lazyNode._init;
           resolvedNode = init(payload);
+        }
+        if (request.status === ABORTING) {
+          throw AbortSigil;
         }
         // Now we render the resolved node
         renderNodeDestructive(request, task, resolvedNode, childIndex);
@@ -3691,6 +3772,11 @@ function abortTask(task: Task, request: Request, error: mixed): void {
   const boundary = task.blockedBoundary;
   const segment = task.blockedSegment;
   if (segment !== null) {
+    if (segment.status === RENDERING) {
+      // This is the a currently rendering Segment. The render itself will
+      // abort the task.
+      return;
+    }
     segment.status = ABORTED;
   }
 
@@ -3985,6 +4071,10 @@ function retryRenderTask(
     // We completed this by other means before we had a chance to retry it.
     return;
   }
+
+  // We track when a Segment is rendering so we can handle aborts while rendering
+  segment.status = RENDERING;
+
   // We restore the context to what it was when we suspended.
   // We don't restore it after we leave because it's likely that we'll end up
   // needing a very similar context soon again.
@@ -4033,9 +4123,10 @@ function retryRenderTask(
       // $FlowFixMe[method-unbinding]
       if (typeof x.then === 'function') {
         // Something suspended again, let's pick it back up later.
+        segment.status = PENDING;
+        task.thenableState = getThenableStateAfterSuspending();
         const ping = task.ping;
         x.then(ping, ping);
-        task.thenableState = getThenableStateAfterSuspending();
         return;
       } else if (
         enablePostpone &&
@@ -4064,14 +4155,26 @@ function retryRenderTask(
 
     const errorInfo = getThrownInfo(task.componentStack);
     task.abortSet.delete(task);
-    segment.status = ERRORED;
-    erroredTask(
-      request,
-      task.blockedBoundary,
-      x,
-      errorInfo,
-      __DEV__ && enableOwnerStacks ? task.debugTask : null,
-    );
+
+    if (x === AbortSigil) {
+      segment.status = ABORTED;
+      erroredTask(
+        request,
+        task.blockedBoundary,
+        request.fatalError,
+        errorInfo,
+        __DEV__ && enableOwnerStacks ? task.debugTask : null,
+      );
+    } else {
+      segment.status = ERRORED;
+      erroredTask(
+        request,
+        task.blockedBoundary,
+        x,
+        errorInfo,
+        __DEV__ && enableOwnerStacks ? task.debugTask : null,
+      );
+    }
     return;
   } finally {
     if (__DEV__) {
@@ -4145,7 +4248,7 @@ function retryReplayTask(request: Request, task: ReplayTask): void {
     erroredReplay(
       request,
       task.blockedBoundary,
-      x,
+      x === AbortSigil ? request.fatalError : x,
       errorInfo,
       task.replay.nodes,
       task.replay.slots,
@@ -4168,7 +4271,7 @@ function retryReplayTask(request: Request, task: ReplayTask): void {
 }
 
 export function performWork(request: Request): void {
-  if (request.status === CLOSED) {
+  if (request.status === CLOSED || request.status === CLOSING) {
     return;
   }
   const prevContext = getActiveContext();
@@ -4678,6 +4781,7 @@ function flushCompletedQueues(
         }
       }
       // We're done.
+      request.status = CLOSED;
       close(destination);
       // We need to stop flowing now because we do not want any async contexts which might call
       // float methods to initiate any flushes after this point
@@ -4799,13 +4903,23 @@ export function stopFlowing(request: Request): void {
 
 // This is called to early terminate a request. It puts all pending boundaries in client rendered state.
 export function abort(request: Request, reason: mixed): void {
+  if (request.status === OPEN) {
+    request.status = ABORTING;
+  }
   try {
     const abortableTasks = request.abortableTasks;
     if (abortableTasks.size > 0) {
       const error =
         reason === undefined
           ? new Error('The render was aborted by the server without a reason.')
-          : reason;
+          : typeof reason === 'object' &&
+              reason !== null &&
+              typeof reason.then === 'function'
+            ? new Error('The render was aborted by the server with a promise.')
+            : reason;
+      // This error isn't necessarily fatal in this case but we need to stash it
+      // so we can use it to abort any pending work
+      request.fatalError = error;
       abortableTasks.forEach(task => abortTask(task, request, error));
       abortableTasks.clear();
     }
