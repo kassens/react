@@ -469,14 +469,14 @@ export function finalizeContainerChildren(
   container: Container,
   newChildren: ChildSet,
 ): void {
-  completeRoot(container, newChildren);
+  // Noop - children will be replaced in replaceContainerChildren
 }
 
 export function replaceContainerChildren(
   container: Container,
   newChildren: ChildSet,
 ): void {
-  // Noop - children will be replaced in finalizeContainerChildren
+  completeRoot(container, newChildren);
 }
 
 export function getInstanceFromNode(node: any): empty {
