@@ -747,6 +747,8 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
           newChildren: Array<Instance | TextInstance>,
         ): void {
           container.pendingChildren = newChildren;
+          // Shouldn't this set final children?
+          //   container.children = newChildren;
           if (
             newChildren.length === 1 &&
             newChildren[0].text === 'Error when completing root'
