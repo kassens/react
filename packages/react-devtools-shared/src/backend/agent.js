@@ -152,6 +152,7 @@ export default class Agent extends EventEmitter<{
   traceUpdates: [Set<HostInstance>],
   drawTraceUpdates: [Array<HostInstance>],
   disableTraceUpdates: [],
+  getIfHasUnsupportedRendererVersion: [],
 }> {
   _bridge: BackendBridge;
   _isProfiling: boolean = false;
@@ -220,8 +221,11 @@ export default class Agent extends EventEmitter<{
       this.updateConsolePatchSettings,
     );
     bridge.addListener('updateComponentFilters', this.updateComponentFilters);
-    bridge.addListener('viewAttributeSource', this.viewAttributeSource);
-    bridge.addListener('viewElementSource', this.viewElementSource);
+    bridge.addListener('getEnvironmentNames', this.getEnvironmentNames);
+    bridge.addListener(
+      'getIfHasUnsupportedRendererVersion',
+      this.getIfHasUnsupportedRendererVersion,
+    );
 
     // Temporarily support older standalone front-ends sending commands to newer embedded backends.
     // We do this because React Native embeds the React DevTools backend,
@@ -231,17 +235,15 @@ export default class Agent extends EventEmitter<{
     bridge.addListener('overrideProps', this.overrideProps);
     bridge.addListener('overrideState', this.overrideState);
 
+    setupHighlighter(bridge, this);
+    setupTraceUpdates(this);
+
+    // By this time, Store should already be initialized and intercept events
+    bridge.send('backendInitialized');
+
     if (this._isProfiling) {
       bridge.send('profilingStatus', true);
     }
-
-    // Send the Bridge protocol and backend versions, after initialization, in case the frontend has already requested it.
-    // The Store may be instantiated beore the agent.
-    const version = process.env.DEVTOOLS_VERSION;
-    if (version) {
-      this._bridge.send('backendVersion', version);
-    }
-    this._bridge.send('bridgeProtocol', currentBridgeProtocol);
 
     // Notify the frontend if the backend supports the Storage API (e.g. localStorage).
     // If not, features like reload-and-profile will not work correctly and must be disabled.
@@ -252,9 +254,6 @@ export default class Agent extends EventEmitter<{
     } catch (error) {}
     bridge.send('isBackendStorageAPISupported', isBackendStorageAPISupported);
     bridge.send('isSynchronousXHRSupported', isSynchronousXHRSupported());
-
-    setupHighlighter(bridge, this);
-    setupTraceUpdates(this);
   }
 
   get rendererInterfaces(): {[key: RendererID]: RendererInterface, ...} {
@@ -343,84 +342,123 @@ export default class Agent extends EventEmitter<{
   }
 
   getIDForHostInstance(target: HostInstance): number | null {
-    let bestMatch: null | HostInstance = null;
-    let bestRenderer: null | RendererInterface = null;
-    // Find the nearest ancestor which is mounted by a React.
-    for (const rendererID in this._rendererInterfaces) {
-      const renderer = ((this._rendererInterfaces[
-        (rendererID: any)
-      ]: any): RendererInterface);
-      const nearestNode: null = renderer.getNearestMountedHostInstance(target);
-      if (nearestNode !== null) {
-        if (nearestNode === target) {
-          // Exact match we can exit early.
-          bestMatch = nearestNode;
-          bestRenderer = renderer;
-          break;
-        }
-        if (
-          bestMatch === null ||
-          (!isReactNativeEnvironment() && bestMatch.contains(nearestNode))
-        ) {
-          // If this is the first match or the previous match contains the new match,
-          // so the new match is a deeper and therefore better match.
-          bestMatch = nearestNode;
-          bestRenderer = renderer;
+    if (isReactNativeEnvironment() || typeof target.nodeType !== 'number') {
+      // In React Native or non-DOM we simply pick any renderer that has a match.
+      for (const rendererID in this._rendererInterfaces) {
+        const renderer = ((this._rendererInterfaces[
+          (rendererID: any)
+        ]: any): RendererInterface);
+        try {
+          const match = renderer.getElementIDForHostInstance(target);
+          if (match != null) {
+            return match;
+          }
+        } catch (error) {
+          // Some old React versions might throw if they can't find a match.
+          // If so we should ignore it...
         }
       }
-    }
-    if (bestRenderer != null && bestMatch != null) {
-      try {
-        return bestRenderer.getElementIDForHostInstance(bestMatch, true);
-      } catch (error) {
-        // Some old React versions might throw if they can't find a match.
-        // If so we should ignore it...
+      return null;
+    } else {
+      // In the DOM we use a smarter mechanism to find the deepest a DOM node
+      // that is registered if there isn't an exact match.
+      let bestMatch: null | Element = null;
+      let bestRenderer: null | RendererInterface = null;
+      // Find the nearest ancestor which is mounted by a React.
+      for (const rendererID in this._rendererInterfaces) {
+        const renderer = ((this._rendererInterfaces[
+          (rendererID: any)
+        ]: any): RendererInterface);
+        const nearestNode: null | Element = renderer.getNearestMountedDOMNode(
+          (target: any),
+        );
+        if (nearestNode !== null) {
+          if (nearestNode === target) {
+            // Exact match we can exit early.
+            bestMatch = nearestNode;
+            bestRenderer = renderer;
+            break;
+          }
+          if (bestMatch === null || bestMatch.contains(nearestNode)) {
+            // If this is the first match or the previous match contains the new match,
+            // so the new match is a deeper and therefore better match.
+            bestMatch = nearestNode;
+            bestRenderer = renderer;
+          }
+        }
       }
+      if (bestRenderer != null && bestMatch != null) {
+        try {
+          return bestRenderer.getElementIDForHostInstance(bestMatch);
+        } catch (error) {
+          // Some old React versions might throw if they can't find a match.
+          // If so we should ignore it...
+        }
+      }
+      return null;
     }
-    return null;
   }
 
   getComponentNameForHostInstance(target: HostInstance): string | null {
     // We duplicate this code from getIDForHostInstance to avoid an object allocation.
-    let bestMatch: null | HostInstance = null;
-    let bestRenderer: null | RendererInterface = null;
-    // Find the nearest ancestor which is mounted by a React.
-    for (const rendererID in this._rendererInterfaces) {
-      const renderer = ((this._rendererInterfaces[
-        (rendererID: any)
-      ]: any): RendererInterface);
-      const nearestNode = renderer.getNearestMountedHostInstance(target);
-      if (nearestNode !== null) {
-        if (nearestNode === target) {
-          // Exact match we can exit early.
-          bestMatch = nearestNode;
-          bestRenderer = renderer;
-          break;
-        }
-        if (
-          bestMatch === null ||
-          (!isReactNativeEnvironment() && bestMatch.contains(nearestNode))
-        ) {
-          // If this is the first match or the previous match contains the new match,
-          // so the new match is a deeper and therefore better match.
-          bestMatch = nearestNode;
-          bestRenderer = renderer;
+    if (isReactNativeEnvironment() || typeof target.nodeType !== 'number') {
+      // In React Native or non-DOM we simply pick any renderer that has a match.
+      for (const rendererID in this._rendererInterfaces) {
+        const renderer = ((this._rendererInterfaces[
+          (rendererID: any)
+        ]: any): RendererInterface);
+        try {
+          const id = renderer.getElementIDForHostInstance(target);
+          if (id) {
+            return renderer.getDisplayNameForElementID(id);
+          }
+        } catch (error) {
+          // Some old React versions might throw if they can't find a match.
+          // If so we should ignore it...
         }
       }
-    }
-
-    if (bestRenderer != null && bestMatch != null) {
-      try {
-        const id = bestRenderer.getElementIDForHostInstance(bestMatch, true);
-        if (id) {
-          return bestRenderer.getDisplayNameForElementID(id);
+      return null;
+    } else {
+      // In the DOM we use a smarter mechanism to find the deepest a DOM node
+      // that is registered if there isn't an exact match.
+      let bestMatch: null | Element = null;
+      let bestRenderer: null | RendererInterface = null;
+      // Find the nearest ancestor which is mounted by a React.
+      for (const rendererID in this._rendererInterfaces) {
+        const renderer = ((this._rendererInterfaces[
+          (rendererID: any)
+        ]: any): RendererInterface);
+        const nearestNode: null | Element = renderer.getNearestMountedDOMNode(
+          (target: any),
+        );
+        if (nearestNode !== null) {
+          if (nearestNode === target) {
+            // Exact match we can exit early.
+            bestMatch = nearestNode;
+            bestRenderer = renderer;
+            break;
+          }
+          if (bestMatch === null || bestMatch.contains(nearestNode)) {
+            // If this is the first match or the previous match contains the new match,
+            // so the new match is a deeper and therefore better match.
+            bestMatch = nearestNode;
+            bestRenderer = renderer;
+          }
         }
-      } catch (error) {
-        // Some old React versions might throw if they can't find a match.
-        // If so we should ignore it...
       }
+      if (bestRenderer != null && bestMatch != null) {
+        try {
+          const id = bestRenderer.getElementIDForHostInstance(bestMatch);
+          if (id) {
+            return bestRenderer.getDisplayNameForElementID(id);
+          }
+        } catch (error) {
+          // Some old React versions might throw if they can't find a match.
+          // If so we should ignore it...
+        }
+      }
+      return null;
     }
-    return null;
   }
 
   getBackendVersion: () => void = () => {
@@ -676,7 +714,7 @@ export default class Agent extends EventEmitter<{
     }
   }
 
-  setRendererInterface(
+  registerRendererInterface(
     rendererID: RendererID,
     rendererInterface: RendererInterface,
   ) {
@@ -816,22 +854,22 @@ export default class Agent extends EventEmitter<{
       }
     };
 
-  viewAttributeSource: CopyElementParams => void = ({id, path, rendererID}) => {
-    const renderer = this._rendererInterfaces[rendererID];
-    if (renderer == null) {
-      console.warn(`Invalid renderer id "${rendererID}" for element "${id}"`);
-    } else {
-      renderer.prepareViewAttributeSource(id, path);
+  getEnvironmentNames: () => void = () => {
+    let accumulatedNames = null;
+    for (const rendererID in this._rendererInterfaces) {
+      const renderer = this._rendererInterfaces[+rendererID];
+      const names = renderer.getEnvironmentNames();
+      if (accumulatedNames === null) {
+        accumulatedNames = names;
+      } else {
+        for (let i = 0; i < names.length; i++) {
+          if (accumulatedNames.indexOf(names[i]) === -1) {
+            accumulatedNames.push(names[i]);
+          }
+        }
+      }
     }
-  };
-
-  viewElementSource: ElementAndRendererID => void = ({id, rendererID}) => {
-    const renderer = this._rendererInterfaces[rendererID];
-    if (renderer == null) {
-      console.warn(`Invalid renderer id "${rendererID}" for element "${id}"`);
-    } else {
-      renderer.prepareViewElementSource(id);
-    }
+    this._bridge.send('environmentNames', accumulatedNames || []);
   };
 
   onTraceUpdates: (nodes: Set<HostInstance>) => void = nodes => {
@@ -907,8 +945,12 @@ export default class Agent extends EventEmitter<{
     }
   };
 
-  onUnsupportedRenderer(rendererID: number) {
-    this._bridge.send('unsupportedRendererVersion', rendererID);
+  getIfHasUnsupportedRendererVersion: () => void = () => {
+    this.emit('getIfHasUnsupportedRendererVersion');
+  };
+
+  onUnsupportedRenderer() {
+    this._bridge.send('unsupportedRendererVersion');
   }
 
   _persistSelectionTimerScheduled: boolean = false;

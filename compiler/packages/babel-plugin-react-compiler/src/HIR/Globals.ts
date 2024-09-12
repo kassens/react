@@ -9,6 +9,7 @@ import {Effect, ValueKind, ValueReason} from './HIR';
 import {
   BUILTIN_SHAPES,
   BuiltInArrayId,
+  BuiltInMixedReadonlyId,
   BuiltInUseActionStateId,
   BuiltInUseContextHookId,
   BuiltInUseEffectHookId,
@@ -18,12 +19,17 @@ import {
   BuiltInUseReducerId,
   BuiltInUseRefId,
   BuiltInUseStateId,
+  BuiltInUseTransitionId,
   ShapeRegistry,
   addFunction,
   addHook,
   addObject,
 } from './ObjectShape';
 import {BuiltInType, PolyType} from './Types';
+import {TypeConfig} from './TypeSchema';
+import {assertExhaustive} from '../Utils/utils';
+import {isHookName} from './Environment';
+import {CompilerError, SourceLocation} from '..';
 
 /*
  * This file exports types and defaults for JavaScript global objects.
@@ -426,6 +432,17 @@ const REACT_APIS: Array<[string, BuiltInType]> = [
     ),
   ],
   [
+    'useTransition',
+    addHook(DEFAULT_SHAPES, {
+      positionalParams: [],
+      restParam: null,
+      returnType: {kind: 'Object', shapeId: BuiltInUseTransitionId},
+      calleeEffect: Effect.Read,
+      hookKind: 'useTransition',
+      returnValueKind: ValueKind.Frozen,
+    }),
+  ],
+  [
     'use',
     addFunction(
       DEFAULT_SHAPES,
@@ -515,6 +532,114 @@ DEFAULT_GLOBALS.set(
   'global',
   addObject(DEFAULT_SHAPES, 'global', TYPED_GLOBALS),
 );
+
+export function installTypeConfig(
+  globals: GlobalRegistry,
+  shapes: ShapeRegistry,
+  typeConfig: TypeConfig,
+  moduleName: string,
+  loc: SourceLocation,
+): Global {
+  switch (typeConfig.kind) {
+    case 'type': {
+      switch (typeConfig.name) {
+        case 'Array': {
+          return {kind: 'Object', shapeId: BuiltInArrayId};
+        }
+        case 'MixedReadonly': {
+          return {kind: 'Object', shapeId: BuiltInMixedReadonlyId};
+        }
+        case 'Primitive': {
+          return {kind: 'Primitive'};
+        }
+        case 'Ref': {
+          return {kind: 'Object', shapeId: BuiltInUseRefId};
+        }
+        case 'Any': {
+          return {kind: 'Poly'};
+        }
+        default: {
+          assertExhaustive(
+            typeConfig.name,
+            `Unexpected type '${(typeConfig as any).name}'`,
+          );
+        }
+      }
+    }
+    case 'function': {
+      return addFunction(shapes, [], {
+        positionalParams: typeConfig.positionalParams,
+        restParam: typeConfig.restParam,
+        calleeEffect: typeConfig.calleeEffect,
+        returnType: installTypeConfig(
+          globals,
+          shapes,
+          typeConfig.returnType,
+          moduleName,
+          loc,
+        ),
+        returnValueKind: typeConfig.returnValueKind,
+        noAlias: typeConfig.noAlias === true,
+        mutableOnlyIfOperandsAreMutable:
+          typeConfig.mutableOnlyIfOperandsAreMutable === true,
+      });
+    }
+    case 'hook': {
+      return addHook(shapes, {
+        hookKind: 'Custom',
+        positionalParams: typeConfig.positionalParams ?? [],
+        restParam: typeConfig.restParam ?? Effect.Freeze,
+        calleeEffect: Effect.Read,
+        returnType: installTypeConfig(
+          globals,
+          shapes,
+          typeConfig.returnType,
+          moduleName,
+          loc,
+        ),
+        returnValueKind: typeConfig.returnValueKind ?? ValueKind.Frozen,
+        noAlias: typeConfig.noAlias === true,
+      });
+    }
+    case 'object': {
+      return addObject(
+        shapes,
+        null,
+        Object.entries(typeConfig.properties ?? {}).map(([key, value]) => {
+          const type = installTypeConfig(
+            globals,
+            shapes,
+            value,
+            moduleName,
+            loc,
+          );
+          const expectHook = isHookName(key);
+          let isHook = false;
+          if (type.kind === 'Function' && type.shapeId !== null) {
+            const functionType = shapes.get(type.shapeId);
+            if (functionType?.functionType?.hookKind !== null) {
+              isHook = true;
+            }
+          }
+          if (expectHook !== isHook) {
+            CompilerError.throwInvalidConfig({
+              reason: `Invalid type configuration for module`,
+              description: `Expected type for object property '${key}' from module '${moduleName}' ${expectHook ? 'to be a hook' : 'not to be a hook'} based on the property name`,
+              loc,
+            });
+          }
+          return [key, type];
+        }),
+      );
+    }
+    default: {
+      assertExhaustive(
+        typeConfig,
+        `Unexpected type kind '${(typeConfig as any).kind}'`,
+      );
+    }
+  }
+}
 
 export function installReAnimatedTypes(
   globals: GlobalRegistry,

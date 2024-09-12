@@ -2872,6 +2872,32 @@ describe('ReactHooksWithNoopRenderer', () => {
       });
     });
 
+    it('runs insertion effect cleanup when unmounting in Offscreen state', async () => {
+      function Logger(props) {
+        useInsertionEffect(() => {
+          Scheduler.log(`create`);
+          return () => {
+            Scheduler.log(`destroy`);
+          };
+        }, []);
+        return null;
+      }
+
+      await act(async () => {
+        ReactNoop.render(
+          <React.unstable_Activity mode="hidden">
+            <Logger name="hidden" />
+          </React.unstable_Activity>,
+        );
+        await waitForAll(['create']);
+      });
+
+      await act(async () => {
+        ReactNoop.render(null);
+        await waitForAll(['destroy']);
+      });
+    });
+
     it('assumes insertion effect destroy function is either a function or undefined', async () => {
       function App(props) {
         useInsertionEffect(() => {
@@ -3544,7 +3570,13 @@ describe('ReactHooksWithNoopRenderer', () => {
         ReactNoop.render(<App />);
       });
 
-      assertLog(['A', 'Suspend! [A]', 'Loading']);
+      assertLog([
+        'A',
+        'Suspend! [A]',
+        'Loading',
+
+        ...(gate('enableSiblingPrerendering') ? ['Suspend! [A]'] : []),
+      ]);
       expect(ReactNoop).toMatchRenderedOutput(
         <>
           <span prop="A" />

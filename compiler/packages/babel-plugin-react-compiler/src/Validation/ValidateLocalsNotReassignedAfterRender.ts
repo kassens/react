@@ -130,6 +130,16 @@ function getContextReassignment(
              */
             contextVariables.add(value.lvalue.place.identifier.id);
           }
+          const reassignment = reassigningFunctions.get(
+            value.value.identifier.id,
+          );
+          if (reassignment !== undefined) {
+            reassigningFunctions.set(
+              value.lvalue.place.identifier.id,
+              reassignment,
+            );
+            reassigningFunctions.set(lvalue.identifier.id, reassignment);
+          }
           break;
         }
         default: {
@@ -150,6 +160,14 @@ function getContextReassignment(
             );
             if (signature?.noAlias) {
               operands = [value.receiver, value.property];
+            }
+          } else if (value.kind === 'TaggedTemplateExpression') {
+            const signature = getFunctionCallSignature(
+              fn.env,
+              value.tag.identifier.type,
+            );
+            if (signature?.noAlias) {
+              operands = [value.tag];
             }
           }
           for (const operand of operands) {

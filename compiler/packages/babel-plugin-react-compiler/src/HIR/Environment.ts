@@ -17,6 +17,7 @@ import {
   Global,
   GlobalRegistry,
   installReAnimatedTypes,
+  installTypeConfig,
 } from './Globals';
 import {
   BlockId,
@@ -28,9 +29,11 @@ import {
   NonLocalBinding,
   PolyType,
   ScopeId,
+  SourceLocation,
   Type,
   ValidatedIdentifier,
   ValueKind,
+  getHookKindForType,
   makeBlockId,
   makeIdentifierId,
   makeIdentifierName,
@@ -45,6 +48,7 @@ import {
   addHook,
 } from './ObjectShape';
 import {Scope as BabelScope} from '@babel/traverse';
+import {TypeSchema} from './TypeSchema';
 
 export const ExternalFunctionSchema = z.object({
   // Source for the imported module that exports the `importSpecifierName` functions
@@ -138,6 +142,12 @@ const EnvironmentConfigSchema = z.object({
   customHooks: z.map(z.string(), HookSchema).optional().default(new Map()),
 
   /**
+   * A function that, given the name of a module, can optionally return a description
+   * of that module's type signature.
+   */
+  moduleTypeProvider: z.nullable(z.function().args(z.string())).default(null),
+
+  /**
    * A list of functions which the application compiles as macros, where
    * the compiler must ensure they are not compiled to rename the macro or separate the
    * "function" from its argument.
@@ -213,7 +223,15 @@ const EnvironmentConfigSchema = z.object({
    */
   enableUseTypeAnnotations: z.boolean().default(false),
 
-  enableReactiveScopesInHIR: z.boolean().default(true),
+  enablePropagateDepsInHIR: z.boolean().default(false),
+
+  /**
+   * Enables inference of optional dependency chains. Without this flag
+   * a property chain such as `props?.items?.foo` will infer as a dep on
+   * just `props`. With this flag enabled, we'll infer that full path as
+   * the dependency.
+   */
+  enableOptionalDependencies: z.boolean().default(true),
 
   /*
    * Enable validation of hooks to partially check that the component honors the rules of hooks.
@@ -223,13 +241,25 @@ const EnvironmentConfigSchema = z.object({
   validateHooksUsage: z.boolean().default(true),
 
   // Validate that ref values (`ref.current`) are not accessed during render.
-  validateRefAccessDuringRender: z.boolean().default(false),
+  validateRefAccessDuringRender: z.boolean().default(true),
 
   /*
    * Validates that setState is not unconditionally called during render, as it can lead to
    * infinite loops.
    */
   validateNoSetStateInRender: z.boolean().default(true),
+
+  /**
+   * Validates that setState is not called directly within a passive effect (useEffect).
+   * Scheduling a setState (with an event listener, subscription, etc) is valid.
+   */
+  validateNoSetStateInPassiveEffects: z.boolean().default(false),
+
+  /**
+   * Validates against creating JSX within a try block and recommends using an error boundary
+   * instead.
+   */
+  validateNoJSXInTryStatements: z.boolean().default(false),
 
   /**
    * Validates that the dependencies of all effect hooks are memoized. This helps ensure
@@ -565,6 +595,7 @@ export function printFunctionType(type: ReactFunctionType): string {
 export class Environment {
   #globals: GlobalRegistry;
   #shapes: ShapeRegistry;
+  #moduleTypes: Map<string, Global | null> = new Map();
   #nextIdentifer: number = 0;
   #nextBlock: number = 0;
   #nextScope: number = 0;
@@ -686,7 +717,42 @@ export class Environment {
     return this.#outlinedFunctions;
   }
 
-  getGlobalDeclaration(binding: NonLocalBinding): Global | null {
+  #resolveModuleType(moduleName: string, loc: SourceLocation): Global | null {
+    if (this.config.moduleTypeProvider == null) {
+      return null;
+    }
+    let moduleType = this.#moduleTypes.get(moduleName);
+    if (moduleType === undefined) {
+      const unparsedModuleConfig = this.config.moduleTypeProvider(moduleName);
+      if (unparsedModuleConfig != null) {
+        const parsedModuleConfig = TypeSchema.safeParse(unparsedModuleConfig);
+        if (!parsedModuleConfig.success) {
+          CompilerError.throwInvalidConfig({
+            reason: `Could not parse module type, the configured \`moduleTypeProvider\` function returned an invalid module description`,
+            description: parsedModuleConfig.error.toString(),
+            loc,
+          });
+        }
+        const moduleConfig = parsedModuleConfig.data;
+        moduleType = installTypeConfig(
+          this.#globals,
+          this.#shapes,
+          moduleConfig,
+          moduleName,
+          loc,
+        );
+      } else {
+        moduleType = null;
+      }
+      this.#moduleTypes.set(moduleName, moduleType);
+    }
+    return moduleType;
+  }
+
+  getGlobalDeclaration(
+    binding: NonLocalBinding,
+    loc: SourceLocation,
+  ): Global | null {
     if (this.config.hookPattern != null) {
       const match = new RegExp(this.config.hookPattern).exec(binding.name);
       if (
@@ -724,6 +790,32 @@ export class Environment {
             (isHookName(binding.imported) ? this.#getCustomHookType() : null)
           );
         } else {
+          const moduleType = this.#resolveModuleType(binding.module, loc);
+          if (moduleType !== null) {
+            const importedType = this.getPropertyType(
+              moduleType,
+              binding.imported,
+            );
+            if (importedType != null) {
+              /*
+               * Check that hook-like export names are hook types, and non-hook names are non-hook types.
+               * The user-assigned alias isn't decidable by the type provider, so we ignore that for the check.
+               * Thus we allow `import {fooNonHook as useFoo} from ...` because the name and type both say
+               * that it's not a hook.
+               */
+              const expectHook = isHookName(binding.imported);
+              const isHook = getHookKindForType(this, importedType) != null;
+              if (expectHook !== isHook) {
+                CompilerError.throwInvalidConfig({
+                  reason: `Invalid type configuration for module`,
+                  description: `Expected type for \`import {${binding.imported}} from '${binding.module}'\` ${expectHook ? 'to be a hook' : 'not to be a hook'} based on the exported name`,
+                  loc,
+                });
+              }
+              return importedType;
+            }
+          }
+
           /**
            * For modules we don't own, we look at whether the original name or import alias
            * are hook-like. Both of the following are likely hooks so we would return a hook
@@ -746,6 +838,34 @@ export class Environment {
             (isHookName(binding.name) ? this.#getCustomHookType() : null)
           );
         } else {
+          const moduleType = this.#resolveModuleType(binding.module, loc);
+          if (moduleType !== null) {
+            let importedType: Type | null = null;
+            if (binding.kind === 'ImportDefault') {
+              const defaultType = this.getPropertyType(moduleType, 'default');
+              if (defaultType !== null) {
+                importedType = defaultType;
+              }
+            } else {
+              importedType = moduleType;
+            }
+            if (importedType !== null) {
+              /*
+               * Check that the hook-like modules are defined as types, and non hook-like modules are not typed as hooks.
+               * So `import Foo from 'useFoo'` is expected to be a hook based on the module name
+               */
+              const expectHook = isHookName(binding.module);
+              const isHook = getHookKindForType(this, importedType) != null;
+              if (expectHook !== isHook) {
+                CompilerError.throwInvalidConfig({
+                  reason: `Invalid type configuration for module`,
+                  description: `Expected type for \`import ... from '${binding.module}'\` ${expectHook ? 'to be a hook' : 'not to be a hook'} based on the module name`,
+                  loc,
+                });
+              }
+              return importedType;
+            }
+          }
           return isHookName(binding.name) ? this.#getCustomHookType() : null;
         }
       }
@@ -755,9 +875,7 @@ export class Environment {
   #isKnownReactModule(moduleName: string): boolean {
     return (
       moduleName.toLowerCase() === 'react' ||
-      moduleName.toLowerCase() === 'react-dom' ||
-      (this.config.enableSharedRuntime__testonly &&
-        moduleName === 'shared-runtime')
+      moduleName.toLowerCase() === 'react-dom'
     );
   }
 

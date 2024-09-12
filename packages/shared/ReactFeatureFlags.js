@@ -87,6 +87,8 @@ export const enableTaint = __EXPERIMENTAL__;
 
 export const enablePostpone = __EXPERIMENTAL__;
 
+export const enableHalt = __EXPERIMENTAL__;
+
 /**
  * Switches the Fabric API from doing layout in commit work instead of complete work.
  */
@@ -99,8 +101,7 @@ export const enableObjectFiber = false;
 
 export const enableTransitionTracing = false;
 
-// Shipped on FB, waiting for next stable release to roll out to OSS
-export const enableLazyContextPropagation = __EXPERIMENTAL__;
+export const enableLazyContextPropagation = true;
 
 // Expose unstable useContext for performance testing
 export const enableContextProfiling = false;
@@ -132,7 +133,7 @@ export const alwaysThrottleRetries = true;
 
 export const passChildrenWhenCloningPersistedNodes = false;
 
-export const enableServerComponentLogs = __EXPERIMENTAL__;
+export const enableServerComponentLogs = true;
 
 /**
  * Enables a new Fiber flag used in persisted mode to reduce the number
@@ -145,6 +146,8 @@ export const enableAddPropertiesFastPath = false;
 export const enableOwnerStacks = __EXPERIMENTAL__;
 
 export const enableShallowPropDiffing = false;
+
+export const enableSiblingPrerendering = false;
 
 /**
  * Enables an expiration time for retry lanes to avoid starvation.

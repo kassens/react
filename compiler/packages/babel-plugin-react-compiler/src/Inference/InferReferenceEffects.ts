@@ -30,8 +30,7 @@ import {
   isArrayType,
   isMutableEffect,
   isObjectType,
-  isRefValueType,
-  isUseRefType,
+  isRefOrRefValue,
 } from '../HIR/HIR';
 import {FunctionSignature} from '../HIR/ObjectShape';
 import {
@@ -454,6 +453,37 @@ class InferenceState {
     }
   }
 
+  freezeValues(values: Set<InstructionValue>, reason: Set<ValueReason>): void {
+    for (const value of values) {
+      this.#values.set(value, {
+        kind: ValueKind.Frozen,
+        reason,
+        context: new Set(),
+      });
+      if (value.kind === 'FunctionExpression') {
+        if (
+          this.#env.config.enablePreserveExistingMemoizationGuarantees ||
+          this.#env.config.enableTransitivelyFreezeFunctionExpressions
+        ) {
+          if (value.kind === 'FunctionExpression') {
+            /*
+             * We want to freeze the captured values, not mark the operands
+             * themselves as frozen. There could be mutations that occur
+             * before the freeze we are processing, and it would be invalid
+             * to overwrite those mutations as a freeze.
+             */
+            for (const operand of eachInstructionValueOperand(value)) {
+              const operandValues = this.#variables.get(operand.identifier.id);
+              if (operandValues !== undefined) {
+                this.freezeValues(operandValues, reason);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   reference(
     place: Place,
     effectKind: Effect,
@@ -483,29 +513,7 @@ class InferenceState {
             reason: reasonSet,
             context: new Set(),
           };
-          values.forEach(value => {
-            this.#values.set(value, {
-              kind: ValueKind.Frozen,
-              reason: reasonSet,
-              context: new Set(),
-            });
-
-            if (
-              this.#env.config.enablePreserveExistingMemoizationGuarantees ||
-              this.#env.config.enableTransitivelyFreezeFunctionExpressions
-            ) {
-              if (value.kind === 'FunctionExpression') {
-                for (const operand of eachInstructionValueOperand(value)) {
-                  this.referenceAndRecordEffects(
-                    operand,
-                    Effect.Freeze,
-                    ValueReason.Other,
-                    [],
-                  );
-                }
-              }
-            }
-          });
+          this.freezeValues(values, reasonSet);
         } else {
           effect = Effect.Read;
         }
@@ -523,10 +531,7 @@ class InferenceState {
         break;
       }
       case Effect.Mutate: {
-        if (
-          isRefValueType(place.identifier) ||
-          isUseRefType(place.identifier)
-        ) {
+        if (isRefOrRefValue(place.identifier)) {
           // no-op: refs are validate via ValidateNoRefAccessInRender
         } else if (valueKind.kind === ValueKind.Context) {
           functionEffect = {
@@ -567,10 +572,7 @@ class InferenceState {
         break;
       }
       case Effect.Store: {
-        if (
-          isRefValueType(place.identifier) ||
-          isUseRefType(place.identifier)
-        ) {
+        if (isRefOrRefValue(place.identifier)) {
           // no-op: refs are validate via ValidateNoRefAccessInRender
         } else if (valueKind.kind === ValueKind.Context) {
           functionEffect = {
@@ -1178,18 +1180,6 @@ function inferBlock(
         };
         break;
       }
-      case 'TaggedTemplateExpression': {
-        valueKind = {
-          kind: ValueKind.Mutable,
-          reason: new Set([ValueReason.Other]),
-          context: new Set(),
-        };
-        effect = {
-          kind: Effect.ConditionallyMutate,
-          reason: ValueReason.Other,
-        };
-        break;
-      }
       case 'TemplateLiteral': {
         /*
          * template literal (with no tag function) always produces
@@ -1248,6 +1238,7 @@ function inferBlock(
       case 'ObjectMethod':
       case 'FunctionExpression': {
         let hasMutableOperand = false;
+        const mutableOperands: Array<Place> = [];
         for (const operand of eachInstructionOperand(instr)) {
           state.referenceAndRecordEffects(
             operand,
@@ -1255,6 +1246,9 @@ function inferBlock(
             ValueReason.Other,
             [],
           );
+          if (isMutableEffect(operand.effect, operand.loc)) {
+            mutableOperands.push(operand);
+          }
           hasMutableOperand ||= isMutableEffect(operand.effect, operand.loc);
 
           /**
@@ -1304,6 +1298,47 @@ function inferBlock(
         });
         state.define(instr.lvalue, instrValue);
         instr.lvalue.effect = Effect.Store;
+        continue;
+      }
+      case 'TaggedTemplateExpression': {
+        const operands = [...eachInstructionValueOperand(instrValue)];
+        if (operands.length !== 1) {
+          // future-proofing to make sure we update this case when we support interpolation
+          CompilerError.throwTodo({
+            reason: 'Support tagged template expressions with interpolations',
+            loc: instrValue.loc,
+          });
+        }
+        const signature = getFunctionCallSignature(
+          env,
+          instrValue.tag.identifier.type,
+        );
+        let calleeEffect =
+          signature?.calleeEffect ?? Effect.ConditionallyMutate;
+        const returnValueKind: AbstractValue =
+          signature !== null
+            ? {
+                kind: signature.returnValueKind,
+                reason: new Set([
+                  signature.returnValueReason ??
+                    ValueReason.KnownReturnSignature,
+                ]),
+                context: new Set(),
+              }
+            : {
+                kind: ValueKind.Mutable,
+                reason: new Set([ValueReason.Other]),
+                context: new Set(),
+              };
+        state.referenceAndRecordEffects(
+          instrValue.tag,
+          calleeEffect,
+          ValueReason.Other,
+          functionEffects,
+        );
+        state.initialize(instrValue, returnValueKind);
+        state.define(instr.lvalue, instrValue);
+        instr.lvalue.effect = Effect.ConditionallyMutate;
         continue;
       }
       case 'CallExpression': {

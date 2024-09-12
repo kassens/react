@@ -994,6 +994,13 @@ function codegenTerminal(
             loc: iterableItem.loc,
             suggestions: null,
           });
+        case InstructionKind.HoistedLet:
+          CompilerError.invariant(false, {
+            reason: 'Unexpected HoistedLet variable in for..in collection',
+            description: null,
+            loc: iterableItem.loc,
+            suggestions: null,
+          });
         default:
           assertExhaustive(
             iterableItem.value.lvalue.kind,
@@ -1085,6 +1092,13 @@ function codegenTerminal(
         case InstructionKind.HoistedConst:
           CompilerError.invariant(false, {
             reason: 'Unexpected HoistedConst variable in for..of collection',
+            description: null,
+            loc: iterableItem.loc,
+            suggestions: null,
+          });
+        case InstructionKind.HoistedLet:
+          CompilerError.invariant(false, {
+            reason: 'Unexpected HoistedLet variable in for..of collection',
             description: null,
             loc: iterableItem.loc,
             suggestions: null,
@@ -1289,6 +1303,15 @@ function codegenInstructionNullable(
       case InstructionKind.Catch: {
         return t.emptyStatement();
       }
+      case InstructionKind.HoistedLet: {
+        CompilerError.invariant(false, {
+          reason:
+            'Expected HoistedLet to have been pruned in PruneHoistedContexts',
+          description: null,
+          loc: instr.loc,
+          suggestions: null,
+        });
+      }
       case InstructionKind.HoistedConst: {
         CompilerError.invariant(false, {
           reason:
@@ -1388,7 +1411,7 @@ function printDependencyComment(dependency: ReactiveScopeDependency): string {
   let name = identifier.name;
   if (dependency.path !== null) {
     for (const path of dependency.path) {
-      name += `.${path}`;
+      name += `.${path.property}`;
     }
   }
   return name;
@@ -1423,9 +1446,19 @@ function codegenDependency(
   dependency: ReactiveScopeDependency,
 ): t.Expression {
   let object: t.Expression = convertIdentifier(dependency.identifier);
-  if (dependency.path !== null) {
+  if (dependency.path.length !== 0) {
+    const hasOptional = dependency.path.some(path => path.optional);
     for (const path of dependency.path) {
-      object = t.memberExpression(object, t.identifier(path));
+      if (hasOptional) {
+        object = t.optionalMemberExpression(
+          object,
+          t.identifier(path.property),
+          false,
+          path.optional,
+        );
+      } else {
+        object = t.memberExpression(object, t.identifier(path.property));
+      }
     }
   }
   return object;

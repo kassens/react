@@ -24,6 +24,10 @@ function normalizeCodeLocInfo(str) {
   return (
     str &&
     str.replace(/^ +(?:at|in) ([\S]+)[^\n]*/gm, function (m, name) {
+      const dot = name.lastIndexOf('.');
+      if (dot !== -1) {
+        name = name.slice(dot + 1);
+      }
       return '    in ' + name + (/\d/.test(m) ? ' (at **)' : '');
     })
   );
@@ -299,6 +303,7 @@ describe('ReactFlight', () => {
               {
                 name: 'Greeting',
                 env: 'Server',
+                key: null,
                 owner: null,
                 stack: gate(flag => flag.enableOwnerStacks)
                   ? '    in Object.<anonymous> (at **)'
@@ -337,6 +342,7 @@ describe('ReactFlight', () => {
               {
                 name: 'Greeting',
                 env: 'Server',
+                key: null,
                 owner: null,
                 stack: gate(flag => flag.enableOwnerStacks)
                   ? '    in Object.<anonymous> (at **)'
@@ -2614,6 +2620,7 @@ describe('ReactFlight', () => {
               {
                 name: 'ServerComponent',
                 env: 'Server',
+                key: null,
                 owner: null,
                 stack: gate(flag => flag.enableOwnerStacks)
                   ? '    in Object.<anonymous> (at **)'
@@ -2631,6 +2638,7 @@ describe('ReactFlight', () => {
               {
                 name: 'ThirdPartyComponent',
                 env: 'third-party',
+                key: null,
                 owner: null,
                 stack: gate(flag => flag.enableOwnerStacks)
                   ? '    in Object.<anonymous> (at **)'
@@ -2645,6 +2653,7 @@ describe('ReactFlight', () => {
               {
                 name: 'ThirdPartyLazyComponent',
                 env: 'third-party',
+                key: null,
                 owner: null,
                 stack: gate(flag => flag.enableOwnerStacks)
                   ? '    in myLazy (at **)\n    in lazyInitializer (at **)'
@@ -2659,6 +2668,7 @@ describe('ReactFlight', () => {
               {
                 name: 'ThirdPartyFragmentComponent',
                 env: 'third-party',
+                key: '3',
                 owner: null,
                 stack: gate(flag => flag.enableOwnerStacks)
                   ? '    in Object.<anonymous> (at **)'
@@ -2732,6 +2742,7 @@ describe('ReactFlight', () => {
               {
                 name: 'ServerComponent',
                 env: 'Server',
+                key: null,
                 owner: null,
                 stack: gate(flag => flag.enableOwnerStacks)
                   ? '    in Object.<anonymous> (at **)'
@@ -2748,6 +2759,7 @@ describe('ReactFlight', () => {
               {
                 name: 'Keyed',
                 env: 'Server',
+                key: 'keyed',
                 owner: null,
                 stack: gate(flag => flag.enableOwnerStacks)
                   ? '    in ServerComponent (at **)'
@@ -2763,6 +2775,7 @@ describe('ReactFlight', () => {
               {
                 name: 'ThirdPartyAsyncIterableComponent',
                 env: 'third-party',
+                key: null,
                 owner: null,
                 stack: gate(flag => flag.enableOwnerStacks)
                   ? '    in Object.<anonymous> (at **)'
@@ -2920,6 +2933,7 @@ describe('ReactFlight', () => {
               {
                 name: 'Component',
                 env: 'A',
+                key: null,
                 owner: null,
                 stack: gate(flag => flag.enableOwnerStacks)
                   ? '    in Object.<anonymous> (at **)'
@@ -2942,8 +2956,14 @@ describe('ReactFlight', () => {
     function foo() {
       return 'hello';
     }
+
     function ServerComponent() {
-      console.log('hi', {prop: 123, fn: foo, map: new Map([['foo', foo]])});
+      console.log('hi', {
+        prop: 123,
+        fn: foo,
+        map: new Map([['foo', foo]]),
+        promise: new Promise(() => {}),
+      });
       throw new Error('err');
     }
 
@@ -3008,6 +3028,9 @@ describe('ReactFlight', () => {
     expect(loggedFn2).not.toBe(foo);
     expect(loggedFn2.toString()).toBe(foo.toString());
 
+    const promise = mockConsoleLog.mock.calls[0][1].promise;
+    expect(promise).toBeInstanceOf(Promise);
+
     expect(ownerStacks).toEqual(['\n    in App (at **)']);
   });
 
@@ -3040,6 +3063,7 @@ describe('ReactFlight', () => {
         const greetInfo = {
           name: 'Greeting',
           env: 'Server',
+          key: null,
           owner: null,
           stack: gate(flag => flag.enableOwnerStacks)
             ? '    in Object.<anonymous> (at **)'
@@ -3050,6 +3074,7 @@ describe('ReactFlight', () => {
           {
             name: 'Container',
             env: 'Server',
+            key: null,
             owner: greetInfo,
             stack: gate(flag => flag.enableOwnerStacks)
               ? '    in Greeting (at **)'
@@ -3100,6 +3125,69 @@ describe('ReactFlight', () => {
 
     expect(normalizeCodeLocInfo(stack)).toBe(
       '\n    in Bar (at **)' + '\n    in Foo (at **)',
+    );
+  });
+
+  // @gate __DEV__ && enableOwnerStacks
+  it('can track owner for a flight response created in another render', async () => {
+    jest.resetModules();
+    jest.mock('react', () => ReactServer);
+    // For this to work the Flight Client needs to be the react-server version.
+    const ReactNoopFlightClienOnTheServer = require('react-noop-renderer/flight-client');
+    jest.resetModules();
+    jest.mock('react', () => React);
+
+    let stack;
+
+    function Component() {
+      stack = ReactServer.captureOwnerStack();
+      return ReactServer.createElement('span', null, 'hi');
+    }
+
+    const ClientComponent = clientReference(Component);
+
+    function ThirdPartyComponent() {
+      return ReactServer.createElement(ClientComponent);
+    }
+
+    // This is rendered outside the render to ensure we don't inherit anything accidental
+    // by being in the same environment which would make it seem like it works when it doesn't.
+    const thirdPartyTransport = ReactNoopFlightServer.render(
+      {children: ReactServer.createElement(ThirdPartyComponent)},
+      {
+        environmentName: 'third-party',
+      },
+    );
+
+    async function fetchThirdParty() {
+      return ReactNoopFlightClienOnTheServer.read(thirdPartyTransport);
+    }
+
+    async function FirstPartyComponent() {
+      // This component fetches from a third party
+      const thirdParty = await fetchThirdParty();
+      return thirdParty.children;
+    }
+    function App() {
+      return ReactServer.createElement(FirstPartyComponent);
+    }
+
+    const transport = ReactNoopFlightServer.render(
+      ReactServer.createElement(App),
+    );
+
+    await act(async () => {
+      const root = await ReactNoopFlightClient.read(transport);
+      ReactNoop.render(root);
+    });
+
+    expect(normalizeCodeLocInfo(stack)).toBe(
+      '\n    in ThirdPartyComponent (at **)' +
+        '\n    in createResponse (at **)' + // These two internal frames should
+        '\n    in read (at **)' + // ideally not be included.
+        '\n    in fetchThirdParty (at **)' +
+        '\n    in FirstPartyComponent (at **)' +
+        '\n    in App (at **)',
     );
   });
 
