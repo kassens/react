@@ -42,9 +42,9 @@ import {
   utfEncodeString,
   filterOutLocationComponentFilters,
 } from 'react-devtools-shared/src/utils';
-import {sessionStorageGetItem} from 'react-devtools-shared/src/storage';
 import {
   formatConsoleArgumentsToSingleString,
+  formatDurationToMicrosecondsGranularity,
   gt,
   gte,
   parseSourceFromComponentStack,
@@ -61,8 +61,6 @@ import {
   __DEBUG__,
   PROFILING_FLAG_BASIC_SUPPORT,
   PROFILING_FLAG_TIMELINE_SUPPORT,
-  SESSION_STORAGE_RELOAD_AND_PROFILE_KEY,
-  SESSION_STORAGE_RECORD_CHANGE_DESCRIPTIONS_KEY,
   TREE_OPERATION_ADD,
   TREE_OPERATION_REMOVE,
   TREE_OPERATION_REORDER_CHILDREN,
@@ -137,6 +135,7 @@ import type {
   WorkTagMap,
   CurrentDispatcherRef,
   LegacyDispatcherRef,
+  ProfilingSettings,
 } from '../types';
 import type {
   ComponentFilter,
@@ -763,16 +762,30 @@ const hostResourceToDevToolsInstanceMap: Map<
   Set<DevToolsInstance>,
 > = new Map();
 
+// Ideally, this should be injected from Reconciler config
 function getPublicInstance(instance: HostInstance): HostInstance {
   // Typically the PublicInstance and HostInstance is the same thing but not in Fabric.
   // So we need to detect this and use that as the public instance.
-  return typeof instance === 'object' &&
-    instance !== null &&
-    typeof instance.canonical === 'object'
-    ? (instance.canonical: any)
-    : typeof instance._nativeTag === 'number'
-      ? instance._nativeTag
-      : instance;
+
+  // React Native. Modern. Fabric.
+  if (typeof instance === 'object' && instance !== null) {
+    if (typeof instance.canonical === 'object' && instance.canonical !== null) {
+      if (
+        typeof instance.canonical.publicInstance === 'object' &&
+        instance.canonical.publicInstance !== null
+      ) {
+        return instance.canonical.publicInstance;
+      }
+    }
+
+    // React Native. Legacy. Paper.
+    if (typeof instance._nativeTag === 'number') {
+      return instance._nativeTag;
+    }
+  }
+
+  // React Web. Usually a DOM element.
+  return instance;
 }
 
 function aquireHostInstance(
@@ -851,6 +864,8 @@ export function attach(
   rendererID: number,
   renderer: ReactRenderer,
   global: Object,
+  shouldStartProfilingNow: boolean,
+  profilingSettings: ProfilingSettings,
 ): RendererInterface {
   // Newer versions of the reconciler package also specific reconciler version.
   // If that version number is present, use it.
@@ -3459,7 +3474,7 @@ export function attach(
   }
 
   function cleanup() {
-    // We don't patch any methods so there is no cleanup.
+    isProfiling = false;
   }
 
   function rootSupportsProfiling(root: any) {
@@ -4335,8 +4350,7 @@ export function attach(
     const componentInfo = virtualInstance.data;
     const key =
       typeof componentInfo.key === 'string' ? componentInfo.key : null;
-    const props = null; // TODO: Track props on ReactComponentInfo;
-
+    const props = componentInfo.props == null ? null : componentInfo.props;
     const owners: null | Array<SerializedElement> =
       getOwnersListFromInstance(virtualInstance);
 
@@ -5021,6 +5035,7 @@ export function attach(
   let isProfiling: boolean = false;
   let profilingStartTime: number = 0;
   let recordChangeDescriptions: boolean = false;
+  let recordTimeline: boolean = false;
   let rootToCommitProfilingMetadataMap: CommitProfilingMetadataMap | null =
     null;
 
@@ -5062,8 +5077,14 @@ export function attach(
           const fiberSelfDurations: Array<[number, number]> = [];
           for (let i = 0; i < durations.length; i += 3) {
             const fiberID = durations[i];
-            fiberActualDurations.push([fiberID, durations[i + 1]]);
-            fiberSelfDurations.push([fiberID, durations[i + 2]]);
+            fiberActualDurations.push([
+              fiberID,
+              formatDurationToMicrosecondsGranularity(durations[i + 1]),
+            ]);
+            fiberSelfDurations.push([
+              fiberID,
+              formatDurationToMicrosecondsGranularity(durations[i + 2]),
+            ]);
           }
 
           commitData.push({
@@ -5071,11 +5092,18 @@ export function attach(
               changeDescriptions !== null
                 ? Array.from(changeDescriptions.entries())
                 : null,
-            duration: maxActualDuration,
-            effectDuration,
+            duration:
+              formatDurationToMicrosecondsGranularity(maxActualDuration),
+            effectDuration:
+              effectDuration !== null
+                ? formatDurationToMicrosecondsGranularity(effectDuration)
+                : null,
             fiberActualDurations,
             fiberSelfDurations,
-            passiveEffectDuration,
+            passiveEffectDuration:
+              passiveEffectDuration !== null
+                ? formatDurationToMicrosecondsGranularity(passiveEffectDuration)
+                : null,
             priorityLevel,
             timestamp: commitTime,
             updaters,
@@ -5149,12 +5177,16 @@ export function attach(
     }
   }
 
-  function startProfiling(shouldRecordChangeDescriptions: boolean) {
+  function startProfiling(
+    shouldRecordChangeDescriptions: boolean,
+    shouldRecordTimeline: boolean,
+  ) {
     if (isProfiling) {
       return;
     }
 
     recordChangeDescriptions = shouldRecordChangeDescriptions;
+    recordTimeline = shouldRecordTimeline;
 
     // Capture initial values as of the time profiling starts.
     // It's important we snapshot both the durations and the id-to-root map,
@@ -5185,7 +5217,7 @@ export function attach(
     rootToCommitProfilingMetadataMap = new Map();
 
     if (toggleProfilingStatus !== null) {
-      toggleProfilingStatus(true);
+      toggleProfilingStatus(true, recordTimeline);
     }
   }
 
@@ -5194,17 +5226,17 @@ export function attach(
     recordChangeDescriptions = false;
 
     if (toggleProfilingStatus !== null) {
-      toggleProfilingStatus(false);
+      toggleProfilingStatus(false, recordTimeline);
     }
+
+    recordTimeline = false;
   }
 
   // Automatically start profiling so that we don't miss timing info from initial "mount".
-  if (
-    sessionStorageGetItem(SESSION_STORAGE_RELOAD_AND_PROFILE_KEY) === 'true'
-  ) {
+  if (shouldStartProfilingNow) {
     startProfiling(
-      sessionStorageGetItem(SESSION_STORAGE_RECORD_CHANGE_DESCRIPTIONS_KEY) ===
-        'true',
+      profilingSettings.recordChangeDescriptions,
+      profilingSettings.recordTimeline,
     );
   }
 
