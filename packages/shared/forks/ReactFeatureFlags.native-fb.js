@@ -90,6 +90,7 @@ export const enableUpdaterTracking = __PROFILE__;
 export const enableUseEffectEventHook = false;
 export const enableUseMemoCacheHook = true;
 export const favorSafetyOverHydrationPerf = true;
+export const logStringRefs: null | ((string, string) => void) = null;
 export const renameElementSymbol = false;
 export const retryLaneExpirationMs = 5000;
 export const syncLaneExpirationMs = 250;
