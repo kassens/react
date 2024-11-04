@@ -18,7 +18,6 @@ import {
   enablePostpone,
   enableHalt,
   enableTaint,
-  enableRefAsProp,
   enableServerComponentLogs,
   enableOwnerStacks,
 } from 'shared/ReactFeatureFlags';
@@ -297,7 +296,7 @@ type ReactJSONValue =
 // Serializable values
 export type ReactClientValue =
   // Server Elements and Lazy Components are unwrapped on the Server
-  | React$Element<React$AbstractComponent<any, any>>
+  | React$Element<React$ComponentType<any>>
   | LazyComponent<ReactClientValue, any>
   // References are passed by their value
   | ClientReference<any>
@@ -2512,16 +2511,10 @@ function renderModelDestructive(
         }
 
         const props = element.props;
-        let ref;
-        if (enableRefAsProp) {
-          // TODO: This is a temporary, intermediate step. Once the feature
-          // flag is removed, we should get the ref off the props object right
-          // before using it.
-          const refProp = props.ref;
-          ref = refProp !== undefined ? refProp : null;
-        } else {
-          ref = element.ref;
-        }
+        // TODO: We should get the ref off the props object right before using
+        // it.
+        const refProp = props.ref;
+        const ref = refProp !== undefined ? refProp : null;
 
         // Attempt to render the Server Component.
 
@@ -3465,7 +3458,18 @@ function renderConsoleValue(
         if (element._owner != null) {
           outlineComponentInfo(request, element._owner);
         }
+        if (typeof element.type === 'object' && element.type !== null) {
+          // If the type is an object it can get cut off which shouldn't happen here.
+          doNotLimit.add(element.type);
+        }
+        if (typeof element.key === 'object' && element.key !== null) {
+          // This should never happen but just in case.
+          doNotLimit.add(element.key);
+        }
         doNotLimit.add(element.props);
+        if (element._owner !== null) {
+          doNotLimit.add(element._owner);
+        }
 
         if (enableOwnerStacks) {
           let debugStack: null | ReactStackTrace = null;
@@ -3739,8 +3743,16 @@ function outlineConsoleValue(
     }
   }
 
-  // $FlowFixMe[incompatible-type] stringify can return null
-  const json: string = stringify(model, replacer);
+  let json: string;
+  try {
+    // $FlowFixMe[incompatible-cast] stringify can return null
+    json = (stringify(model, replacer): string);
+  } catch (x) {
+    // $FlowFixMe[incompatible-cast] stringify can return null
+    json = (stringify(
+      'Unknown Value: React could not send it from the server.\n' + x.message,
+    ): string);
+  }
 
   request.pendingChunks++;
   const id = request.nextChunkId++;
@@ -3799,8 +3811,23 @@ function emitConsoleChunk(
   const payload = [methodName, stackTrace, owner, env];
   // $FlowFixMe[method-unbinding]
   payload.push.apply(payload, args);
-  // $FlowFixMe[incompatible-type] stringify can return null
-  const json: string = stringify(payload, replacer);
+  let json: string;
+  try {
+    // $FlowFixMe[incompatible-type] stringify can return null
+    json = stringify(payload, replacer);
+  } catch (x) {
+    json = stringify(
+      [
+        methodName,
+        stackTrace,
+        owner,
+        env,
+        'Unknown Value: React could not send it from the server.',
+        x,
+      ],
+      replacer,
+    );
+  }
   const row = serializeRowHeader('W', id) + json + '\n';
   const processedChunk = stringToChunk(row);
   request.completedRegularChunks.push(processedChunk);
