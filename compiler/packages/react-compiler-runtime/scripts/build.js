@@ -10,6 +10,7 @@
 const esbuild = require('esbuild');
 const yargs = require('yargs');
 const path = require('path');
+const {Generator} = require('npm-dts');
 
 const argv = yargs(process.argv.slice(2))
   .options('p', {
@@ -29,7 +30,7 @@ const config = {
   outfile: path.join(__dirname, '../dist/index.js'),
   bundle: true,
   external: ['react'],
-  format: argv.p === 'browser' ? 'esm' : 'cjs',
+  format: 'cjs',
   platform: argv.p,
   target: 'es6',
   banner: {
@@ -61,6 +62,10 @@ async function main() {
       minify: false,
       ...config,
     });
+    await new Generator({
+      entry: 'src/index.ts',
+      output: 'dist/index.d.ts',
+    }).generate();
   }
 }
 
