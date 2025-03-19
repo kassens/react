@@ -14,6 +14,7 @@ import {
   Identifier,
   IdentifierId,
   Instruction,
+  makePropertyLiteral,
   makeType,
   PropType,
   Type,
@@ -306,11 +307,26 @@ function* generateInstructionTypes(
         kind: 'Property',
         objectType: value.object.identifier.type,
         objectName: getName(names, value.object.identifier.id),
-        propertyName: value.property,
+        propertyName: {
+          kind: 'literal',
+          value: value.property,
+        },
       });
       break;
     }
 
+    case 'ComputedLoad': {
+      yield equation(left, {
+        kind: 'Property',
+        objectType: value.object.identifier.type,
+        objectName: getName(names, value.object.identifier.id),
+        propertyName: {
+          kind: 'computed',
+          value: value.property.identifier.type,
+        },
+      });
+      break;
+    }
     case 'MethodCall': {
       const returnType = makeType();
       yield equation(value.property.identifier.type, {
@@ -335,7 +351,10 @@ function* generateInstructionTypes(
               kind: 'Property',
               objectType: value.value.identifier.type,
               objectName: getName(names, value.value.identifier.id),
-              propertyName,
+              propertyName: {
+                kind: 'literal',
+                value: makePropertyLiteral(propertyName),
+              },
             });
           } else {
             break;
@@ -352,7 +371,10 @@ function* generateInstructionTypes(
                 kind: 'Property',
                 objectType: value.value.identifier.type,
                 objectName: getName(names, value.value.identifier.id),
-                propertyName: property.key.name,
+                propertyName: {
+                  kind: 'literal',
+                  value: makePropertyLiteral(property.key.name),
+                },
               });
             }
           }
@@ -409,7 +431,6 @@ function* generateInstructionTypes(
     case 'RegExpLiteral':
     case 'MetaProperty':
     case 'ComputedStore':
-    case 'ComputedLoad':
     case 'Await':
     case 'GetIterator':
     case 'IteratorNext':
@@ -453,10 +474,13 @@ class Unifier {
         return;
       }
       const objectType = this.get(tB.objectType);
-      const propertyType = this.env.getPropertyType(
-        objectType,
-        tB.propertyName,
-      );
+      const propertyType =
+        tB.propertyName.kind === 'literal'
+          ? this.env.getPropertyType(objectType, tB.propertyName.value)
+          : this.env.getFallthroughPropertyType(
+              objectType,
+              tB.propertyName.value,
+            );
       if (propertyType !== null) {
         this.unify(tA, propertyType);
       }
@@ -674,7 +698,11 @@ class Unifier {
 const RefLikeNameRE = /^(?:[a-zA-Z$_][a-zA-Z$_0-9]*)Ref$|^ref$/;
 
 function isRefLikeName(t: PropType): boolean {
-  return RefLikeNameRE.test(t.objectName) && t.propertyName === 'current';
+  return (
+    t.propertyName.kind === 'literal' &&
+    RefLikeNameRE.test(t.objectName) &&
+    t.propertyName.value === 'current'
+  );
 }
 
 function tryUnionTypes(ty1: Type, ty2: Type): Type | null {

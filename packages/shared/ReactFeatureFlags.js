@@ -92,10 +92,14 @@ export const enableHalt = __EXPERIMENTAL__;
 
 export const enableViewTransition = __EXPERIMENTAL__;
 
+export const enableSwipeTransition = __EXPERIMENTAL__;
+
+export const enableScrollEndPolyfill = __EXPERIMENTAL__;
+
 /**
- * Switches Fiber creation to a simple object instead of a constructor.
+ * Switches the Fabric API from doing layout in commit work instead of complete work.
  */
-export const enableObjectFiber = false;
+export const enableFabricCompleteRootInCommitPhase = false;
 
 export const enableTransitionTracing = false;
 
@@ -127,8 +131,6 @@ export const passChildrenWhenCloningPersistedNodes = false;
  */
 export const enablePersistedModeClonedFlag = false;
 
-export const enableOwnerStacks = __EXPERIMENTAL__;
-
 export const enableShallowPropDiffing = false;
 
 export const enableSiblingPrerendering = true;
@@ -150,9 +152,12 @@ export const enableInfiniteRenderLoopDetection = false;
 /**
  * Experimental new hook for better managing resources in effects.
  */
-export const enableUseResourceEffectHook = false;
+export const enableUseEffectCRUDOverload = false;
 
 export const enableFastAddPropertiesInDiffing = true;
+export const enableLazyPublicInstanceInFabric = false;
+
+export const enableFragmentRefs = false;
 
 // -----------------------------------------------------------------------------
 // Ready for next major.
@@ -184,7 +189,7 @@ export const disableLegacyContext = true;
 export const disableLegacyContextForFunctionComponents = true;
 
 // Enable the moveBefore() alternative to insertBefore(). This preserves states of moves.
-export const enableMoveBefore = false;
+export const enableMoveBefore = __EXPERIMENTAL__;
 
 // Disabled caching behavior of `react/cache` in client runtimes.
 export const disableClientCache = true;
@@ -258,5 +263,3 @@ export const enableUpdaterTracking = __PROFILE__;
 
 // Internal only.
 export const enableDO_NOT_USE_disableStrictPassiveEffect = false;
-
-export const enableRemoveConsolePatches = true;

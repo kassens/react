@@ -6,6 +6,7 @@
  */
 
 import {CompilerError} from '../CompilerError';
+import {PropertyLiteral} from './HIR';
 
 export type BuiltInType = PrimitiveType | FunctionType | ObjectType;
 
@@ -59,7 +60,15 @@ export type PropType = {
   kind: 'Property';
   objectType: Type;
   objectName: string;
-  propertyName: string;
+  propertyName:
+    | {
+        kind: 'literal';
+        value: PropertyLiteral;
+      }
+    | {
+        kind: 'computed';
+        value: Type;
+      };
 };
 
 export type ObjectMethod = {

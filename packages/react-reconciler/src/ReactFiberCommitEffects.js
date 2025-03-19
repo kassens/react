@@ -11,6 +11,7 @@ import type {Fiber} from './ReactInternalTypes';
 import type {UpdateQueue} from './ReactFiberClassUpdateQueue';
 import type {FunctionComponentUpdateQueue} from './ReactFiberHooks';
 import type {HookFlags} from './ReactHookEffectTags';
+import type {FragmentInstanceType} from './ReactFiberConfig';
 import {
   getViewTransitionName,
   type ViewTransitionState,
@@ -22,11 +23,13 @@ import {
   enableProfilerCommitHooks,
   enableProfilerNestedUpdatePhase,
   enableSchedulingProfiler,
-  enableUseResourceEffectHook,
+  enableUseEffectCRUDOverload,
   enableViewTransition,
+  enableFragmentRefs,
 } from 'shared/ReactFeatureFlags';
 import {
   ClassComponent,
+  Fragment,
   HostComponent,
   HostHoistable,
   HostSingleton,
@@ -48,6 +51,7 @@ import {
 import {
   getPublicInstance,
   createViewTransitionInstance,
+  createFragmentInstance,
 } from './ReactFiberConfig';
 import {
   captureCommitPhaseError,
@@ -160,7 +164,7 @@ export function commitHookEffectListMount(
 
           // Mount
           let destroy;
-          if (enableUseResourceEffectHook) {
+          if (enableUseEffectCRUDOverload) {
             if (effect.resourceKind === ResourceEffectIdentityKind) {
               if (__DEV__) {
                 effect.inst.resource = runWithFiberInDEV(
@@ -170,8 +174,9 @@ export function commitHookEffectListMount(
                 );
                 if (effect.inst.resource == null) {
                   console.error(
-                    'useResourceEffect must provide a callback which returns a resource. ' +
-                      'If a managed resource is not needed here, use useEffect. Received %s',
+                    'useEffect must provide a callback which returns a resource. ' +
+                      'If a managed resource is not needed here, do not provide an updater or ' +
+                      'destroy callback. Received %s',
                     effect.inst.resource,
                   );
                 }
@@ -200,7 +205,7 @@ export function commitHookEffectListMount(
             if ((flags & HookInsertion) !== NoHookEffect) {
               setIsRunningInsertionEffect(true);
             }
-            if (enableUseResourceEffectHook) {
+            if (enableUseEffectCRUDOverload) {
               if (effect.resourceKind == null) {
                 destroy = runWithFiberInDEV(
                   finishedWork,
@@ -219,7 +224,7 @@ export function commitHookEffectListMount(
               setIsRunningInsertionEffect(false);
             }
           } else {
-            if (enableUseResourceEffectHook) {
+            if (enableUseEffectCRUDOverload) {
               if (effect.resourceKind == null) {
                 const create = effect.create;
                 const inst = effect.inst;
@@ -230,7 +235,7 @@ export function commitHookEffectListMount(
               if (effect.resourceKind != null) {
                 if (__DEV__) {
                   console.error(
-                    'Expected only SimpleEffects when enableUseResourceEffectHook is disabled, ' +
+                    'Expected only SimpleEffects when enableUseEffectCRUDOverload is disabled, ' +
                       'got %s',
                     effect.resourceKind,
                   );
@@ -261,11 +266,6 @@ export function commitHookEffectListMount(
                 hookName = 'useLayoutEffect';
               } else if ((effect.tag & HookInsertion) !== NoFlags) {
                 hookName = 'useInsertionEffect';
-              } else if (
-                enableUseResourceEffectHook &&
-                effect.resourceKind != null
-              ) {
-                hookName = 'useResourceEffect';
               } else {
                 hookName = 'useEffect';
               }
@@ -274,6 +274,7 @@ export function commitHookEffectListMount(
                 addendum =
                   ' You returned null. If your effect does not require clean ' +
                   'up, return undefined (or nothing).';
+                // $FlowFixMe (@poteto) this check is safe on arbitrary non-null/void objects
               } else if (typeof destroy.then === 'function') {
                 addendum =
                   '\n\nIt looks like you wrote ' +
@@ -337,7 +338,7 @@ export function commitHookEffectListUnmount(
           const inst = effect.inst;
           const destroy = inst.destroy;
           if (destroy !== undefined) {
-            if (enableUseResourceEffectHook) {
+            if (enableUseEffectCRUDOverload) {
               if (effect.resourceKind == null) {
                 inst.destroy = undefined;
               }
@@ -357,12 +358,12 @@ export function commitHookEffectListUnmount(
                 setIsRunningInsertionEffect(true);
               }
             }
-            if (enableUseResourceEffectHook) {
+            if (enableUseEffectCRUDOverload) {
               if (
                 effect.resourceKind === ResourceEffectIdentityKind &&
                 effect.inst.resource != null
               ) {
-                safelyCallDestroyWithResource(
+                safelyCallDestroy(
                   finishedWork,
                   nearestMountedAncestor,
                   destroy,
@@ -880,7 +881,7 @@ function commitAttachRef(finishedWork: Fiber) {
       case HostComponent:
         instanceToUse = getPublicInstance(finishedWork.stateNode);
         break;
-      case ViewTransitionComponent:
+      case ViewTransitionComponent: {
         if (enableViewTransition) {
           const instance: ViewTransitionState = finishedWork.stateNode;
           const props: ViewTransitionProps = finishedWork.memoizedProps;
@@ -889,6 +890,18 @@ function commitAttachRef(finishedWork: Fiber) {
             instance.ref = createViewTransitionInstance(name);
           }
           instanceToUse = instance.ref;
+          break;
+        }
+        instanceToUse = finishedWork.stateNode;
+        break;
+      }
+      case Fragment:
+        if (enableFragmentRefs) {
+          const instance: null | FragmentInstanceType = finishedWork.stateNode;
+          if (instance === null) {
+            finishedWork.stateNode = createFragmentInstance(finishedWork);
+          }
+          instanceToUse = finishedWork.stateNode;
           break;
         }
       // Fallthrough
@@ -1014,31 +1027,10 @@ export function safelyDetachRef(
 function safelyCallDestroy(
   current: Fiber,
   nearestMountedAncestor: Fiber | null,
-  destroy: () => void,
+  destroy: (() => void) | (({...}) => void),
+  resource?: {...} | void | null,
 ) {
-  if (__DEV__) {
-    runWithFiberInDEV(
-      current,
-      callDestroyInDEV,
-      current,
-      nearestMountedAncestor,
-      destroy,
-    );
-  } else {
-    try {
-      destroy();
-    } catch (error) {
-      captureCommitPhaseError(current, nearestMountedAncestor, error);
-    }
-  }
-}
-
-function safelyCallDestroyWithResource(
-  current: Fiber,
-  nearestMountedAncestor: Fiber | null,
-  destroy: mixed => void,
-  resource: mixed,
-) {
+  // $FlowFixMe[extra-arg] @poteto this is safe either way because the extra arg is ignored if it's not a CRUD effect
   const destroy_ = resource == null ? destroy : destroy.bind(null, resource);
   if (__DEV__) {
     runWithFiberInDEV(
@@ -1050,6 +1042,7 @@ function safelyCallDestroyWithResource(
     );
   } else {
     try {
+      // $FlowFixMe(incompatible-call) Already bound to resource
       destroy_();
     } catch (error) {
       captureCommitPhaseError(current, nearestMountedAncestor, error);

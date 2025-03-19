@@ -39,13 +39,13 @@ jobs:
         uses: actions/cache@v4
         id: node_modules
         with:
-          path: "**/node_modules"
-          key: runtime-release-node_modules-${{ runner.arch }}-${{ runner.os }}-${{ hashFiles('yarn.lock', 'scripts/release/yarn.lock') }}
+          path: |
+            **/node_modules
+          key: runtime-release-node_modules-v5-${{ runner.arch }}-${{ runner.os }}-${{ hashFiles('yarn.lock', 'scripts/release/yarn.lock') }}
       - name: Ensure clean build directory
         run: rm -rf build
       - run: yarn install --frozen-lockfile
-      - run: yarn install --frozen-lockfile
-        working-directory: scripts/release
+      - run: yarn --cwd scripts/release install --frozen-lockfile
       - run: |
           scripts/release/prepare-release-from-ci.js --skipTests -r ${{ inputs.release_channel }} --commit=${{ inputs.commit_sha }}
           cp ./scripts/release/ci-npmrc ~/.npmrc

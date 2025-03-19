@@ -39,8 +39,6 @@ import {
   enableDO_NOT_USE_disableStrictPassiveEffect,
   enableRenderableContext,
   disableLegacyMode,
-  enableObjectFiber,
-  enableOwnerStacks,
   enableViewTransition,
 } from 'shared/ReactFeatureFlags';
 import {NoFlags, Placement, StaticMask} from './ReactFiberFlags';
@@ -72,6 +70,7 @@ import {
   TracingMarkerComponent,
   Throw,
   ViewTransitionComponent,
+  ActivityComponent,
 } from './ReactWorkTags';
 import {OffscreenVisible} from './ReactFiberActivityComponent';
 import {getComponentNameFromOwner} from 'react-reconciler/src/getComponentNameFromFiber';
@@ -103,11 +102,11 @@ import {
   REACT_MEMO_TYPE,
   REACT_LAZY_TYPE,
   REACT_SCOPE_TYPE,
-  REACT_OFFSCREEN_TYPE,
   REACT_LEGACY_HIDDEN_TYPE,
   REACT_TRACING_MARKER_TYPE,
   REACT_ELEMENT_TYPE,
   REACT_VIEW_TRANSITION_TYPE,
+  REACT_ACTIVITY_TYPE,
 } from 'shared/ReactSymbols';
 import {TransitionTracingMarker} from './ReactFiberTracingMarkerComponent';
 import {
@@ -202,10 +201,8 @@ function FiberNode(
     // This isn't directly used but is handy for debugging internals:
     this._debugInfo = null;
     this._debugOwner = null;
-    if (enableOwnerStacks) {
-      this._debugStack = null;
-      this._debugTask = null;
-    }
+    this._debugStack = null;
+    this._debugTask = null;
     this._debugNeedsRemount = false;
     this._debugHookTypes = null;
     if (!hasBadMapPolyfill && typeof Object.preventExtensions === 'function') {
@@ -227,7 +224,7 @@ function FiberNode(
 //    is faster.
 // 5) It should be easy to port this to a C struct and keep a C implementation
 //    compatible.
-function createFiberImplClass(
+function createFiber(
   tag: WorkTag,
   pendingProps: mixed,
   key: null | string,
@@ -236,79 +233,6 @@ function createFiberImplClass(
   // $FlowFixMe[invalid-constructor]: the shapes are exact here but Flow doesn't like constructors
   return new FiberNode(tag, pendingProps, key, mode);
 }
-
-function createFiberImplObject(
-  tag: WorkTag,
-  pendingProps: mixed,
-  key: null | string,
-  mode: TypeOfMode,
-): Fiber {
-  const fiber: Fiber = {
-    // Instance
-    // tag, key - defined at the bottom as dynamic properties
-    elementType: null,
-    type: null,
-    stateNode: null,
-
-    // Fiber
-    return: null,
-    child: null,
-    sibling: null,
-    index: 0,
-
-    ref: null,
-    refCleanup: null,
-
-    // pendingProps - defined at the bottom as dynamic properties
-    memoizedProps: null,
-    updateQueue: null,
-    memoizedState: null,
-    dependencies: null,
-
-    // Effects
-    flags: NoFlags,
-    subtreeFlags: NoFlags,
-    deletions: null,
-
-    lanes: NoLanes,
-    childLanes: NoLanes,
-
-    alternate: null,
-
-    // dynamic properties at the end for more efficient hermes bytecode
-    tag,
-    key,
-    pendingProps,
-    mode,
-  };
-
-  if (enableProfilerTimer) {
-    fiber.actualDuration = -0;
-    fiber.actualStartTime = -1.1;
-    fiber.selfBaseDuration = -0;
-    fiber.treeBaseDuration = -0;
-  }
-
-  if (__DEV__) {
-    // This isn't directly used but is handy for debugging internals:
-    fiber._debugInfo = null;
-    fiber._debugOwner = null;
-    if (enableOwnerStacks) {
-      fiber._debugStack = null;
-      fiber._debugTask = null;
-    }
-    fiber._debugNeedsRemount = false;
-    fiber._debugHookTypes = null;
-    if (!hasBadMapPolyfill && typeof Object.preventExtensions === 'function') {
-      Object.preventExtensions(fiber);
-    }
-  }
-  return fiber;
-}
-
-const createFiber = enableObjectFiber
-  ? createFiberImplObject
-  : createFiberImplClass;
 
 function shouldConstruct(Component: Function) {
   const prototype = Component.prototype;
@@ -352,10 +276,8 @@ export function createWorkInProgress(current: Fiber, pendingProps: any): Fiber {
       // DEV-only fields
 
       workInProgress._debugOwner = current._debugOwner;
-      if (enableOwnerStacks) {
-        workInProgress._debugStack = current._debugStack;
-        workInProgress._debugTask = current._debugTask;
-      }
+      workInProgress._debugStack = current._debugStack;
+      workInProgress._debugTask = current._debugTask;
       workInProgress._debugHookTypes = current._debugHookTypes;
     }
 
@@ -595,6 +517,8 @@ export function createFiberFromTypeAndProps(
     }
   } else {
     getTag: switch (type) {
+      case REACT_ACTIVITY_TYPE:
+        return createFiberFromActivity(pendingProps, mode, lanes, key);
       case REACT_FRAGMENT_TYPE:
         return createFiberFromFragment(pendingProps.children, mode, lanes, key);
       case REACT_STRICT_MODE_TYPE:
@@ -617,8 +541,6 @@ export function createFiberFromTypeAndProps(
         return createFiberFromSuspense(pendingProps, mode, lanes, key);
       case REACT_SUSPENSE_LIST_TYPE:
         return createFiberFromSuspenseList(pendingProps, mode, lanes, key);
-      case REACT_OFFSCREEN_TYPE:
-        return createFiberFromOffscreen(pendingProps, mode, lanes, key);
       case REACT_LEGACY_HIDDEN_TYPE:
         if (enableLegacyHidden) {
           return createFiberFromLegacyHidden(pendingProps, mode, lanes, key);
@@ -766,10 +688,8 @@ export function createFiberFromElement(
   );
   if (__DEV__) {
     fiber._debugOwner = element._owner;
-    if (enableOwnerStacks) {
-      fiber._debugStack = element._debugStack;
-      fiber._debugTask = element._debugTask;
-    }
+    fiber._debugStack = element._debugStack;
+    fiber._debugTask = element._debugTask;
   }
   return fiber;
 }
@@ -859,7 +779,6 @@ export function createFiberFromOffscreen(
   key: null | string,
 ): Fiber {
   const fiber = createFiber(OffscreenComponent, pendingProps, key, mode);
-  fiber.elementType = REACT_OFFSCREEN_TYPE;
   fiber.lanes = lanes;
   const primaryChildInstance: OffscreenInstance = {
     _visibility: OffscreenVisible,
@@ -872,6 +791,17 @@ export function createFiberFromOffscreen(
     attach: () => attachOffscreenInstance(primaryChildInstance),
   };
   fiber.stateNode = primaryChildInstance;
+  return fiber;
+}
+export function createFiberFromActivity(
+  pendingProps: OffscreenProps,
+  mode: TypeOfMode,
+  lanes: Lanes,
+  key: null | string,
+): Fiber {
+  const fiber = createFiber(ActivityComponent, pendingProps, key, mode);
+  fiber.elementType = REACT_ACTIVITY_TYPE;
+  fiber.lanes = lanes;
   return fiber;
 }
 
@@ -887,6 +817,7 @@ export function createFiberFromViewTransition(
   const instance: ViewTransitionState = {
     autoName: null,
     paired: null,
+    clones: null,
     ref: null,
   };
   fiber.stateNode = instance;

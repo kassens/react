@@ -108,16 +108,7 @@ export type ReactiveValue =
   | ReactiveLogicalValue
   | ReactiveSequenceValue
   | ReactiveTernaryValue
-  | ReactiveOptionalCallValue
-  | ReactiveFunctionValue;
-
-export type ReactiveFunctionValue = {
-  kind: 'ReactiveFunctionValue';
-  fn: ReactiveFunction;
-  dependencies: Array<Place>;
-  returnType: t.FlowType | t.TSType | null;
-  loc: SourceLocation;
-};
+  | ReactiveOptionalCallValue;
 
 export type ReactiveLogicalValue = {
   kind: 'LogicalExpression';
@@ -712,6 +703,10 @@ export type ObjectPropertyKey =
   | {
       kind: 'computed';
       name: Place;
+    }
+  | {
+      kind: 'number';
+      name: number;
     };
 
 export type ObjectProperty = {
@@ -722,7 +717,6 @@ export type ObjectProperty = {
 };
 
 export type LoweredFunction = {
-  dependencies: Array<Place>;
   func: HIRFunction;
 };
 
@@ -947,7 +941,7 @@ export type InstructionValue =
   | {
       kind: 'PropertyStore';
       object: Place;
-      property: string;
+      property: PropertyLiteral;
       value: Place;
       loc: SourceLocation;
     }
@@ -957,7 +951,7 @@ export type InstructionValue =
   | {
       kind: 'PropertyDelete';
       object: Place;
-      property: string;
+      property: PropertyLiteral;
       loc: SourceLocation;
     }
 
@@ -1131,7 +1125,7 @@ export type StoreLocal = {
 export type PropertyLoad = {
   kind: 'PropertyLoad';
   object: Place;
-  property: string;
+  property: PropertyLiteral;
   loc: SourceLocation;
 };
 
@@ -1512,7 +1506,17 @@ export type ReactiveScopeDeclaration = {
   scope: ReactiveScope; // the scope in which the variable was originally declared
 };
 
-export type DependencyPathEntry = {property: string; optional: boolean};
+const opaquePropertyLiteral = Symbol();
+export type PropertyLiteral = (string | number) & {
+  [opaquePropertyLiteral]: 'PropertyLiteral';
+};
+export function makePropertyLiteral(value: string | number): PropertyLiteral {
+  return value as PropertyLiteral;
+}
+export type DependencyPathEntry = {
+  property: PropertyLiteral;
+  optional: boolean;
+};
 export type DependencyPath = Array<DependencyPathEntry>;
 export type ReactiveScopeDependency = {
   identifier: Identifier;

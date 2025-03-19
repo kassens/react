@@ -1843,15 +1843,9 @@ describe('ReactDOMFizzServer', () => {
     assertConsoleErrorDev([
       '<inCorrectTag /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.' +
         '\n' +
-        (gate(flags => flags.enableOwnerStacks)
-          ? '    in inCorrectTag (at **)\n' +
-            '    in C (at **)\n' +
-            '    in A (at **)'
-          : '    in inCorrectTag (at **)\n' +
-            '    in C (at **)\n' +
-            '    in Suspense (at **)\n' +
-            '    in div (at **)\n' +
-            '    in A (at **)'),
+        '    in inCorrectTag (at **)\n' +
+        '    in C (at **)\n' +
+        '    in A (at **)',
     ]);
 
     await act(() => {
@@ -1862,17 +1856,11 @@ describe('ReactDOMFizzServer', () => {
     assertConsoleErrorDev([
       'Each child in a list should have a unique "key" prop.\n\nCheck the render method of `B`.' +
         ' See https://react.dev/link/warning-keys for more information.\n' +
-        (gate(flags => flags.enableOwnerStacks)
-          ? '    in span (at **)\n' +
-            '    in mapper (at **)\n' +
-            '    in Array.map (at **)\n' +
-            '    in B (at **)\n' +
-            '    in A (at **)'
-          : '    in span (at **)\n' +
-            '    in B (at **)\n' +
-            '    in Suspense (at **)\n' +
-            '    in div (at **)\n' +
-            '    in A (at **)'),
+        '    in span (at **)\n' +
+        '    in mapper (at **)\n' +
+        '    in Array.map (at **)\n' +
+        '    in B (at **)\n' +
+        '    in A (at **)',
     ]);
 
     expect(getVisibleChildren(container)).toEqual(
@@ -1954,13 +1942,7 @@ describe('ReactDOMFizzServer', () => {
         '    in TestProvider (at **)',
       'TestConsumer uses the legacy contextTypes API which will soon be removed. ' +
         'Use React.createContext() with static contextType instead. (https://react.dev/link/legacy-context)\n' +
-        '    in TestConsumer (at **)' +
-        (gate('enableOwnerStacks')
-          ? ''
-          : '\n    in TestProvider (at **)' +
-            '\n    in Suspense (at **)' +
-            '\n    in div (at **)' +
-            '\n    in TestProvider (at **)'),
+        '    in TestConsumer (at **)',
     ]);
     expect(getVisibleChildren(container)).toEqual(
       <div>
@@ -3723,23 +3705,43 @@ describe('ReactDOMFizzServer', () => {
     });
   });
 
-  it('encodes img srcset and sizes into preload header params', async () => {
+  it('omits images from preload headers if they contain srcset and sizes', async () => {
     let headers = null;
     function onHeaders(x) {
       headers = x;
     }
 
     function App() {
-      ReactDOM.preload('presrc', {
+      ReactDOM.preload('responsive-preload-set-only', {
         as: 'image',
         fetchPriority: 'high',
-        imageSrcSet: 'presrcset',
-        imageSizes: 'presizes',
+        imageSrcSet: 'srcset',
+      });
+      ReactDOM.preload('responsive-preload', {
+        as: 'image',
+        fetchPriority: 'high',
+        imageSrcSet: 'srcset',
+        imageSizes: 'sizes',
+      });
+      ReactDOM.preload('non-responsive-preload', {
+        as: 'image',
+        fetchPriority: 'high',
       });
       return (
         <html>
           <body>
-            <img src="src" srcSet="srcset" sizes="sizes" />
+            <img
+              src="responsive-img-set-only"
+              fetchPriority="high"
+              srcSet="srcset"
+            />
+            <img
+              src="responsive-img"
+              fetchPriority="high"
+              srcSet="srcset"
+              sizes="sizes"
+            />
+            <img src="non-responsive-img" fetchPriority="high" />
           </body>
         </html>
       );
@@ -3751,8 +3753,8 @@ describe('ReactDOMFizzServer', () => {
 
     expect(headers).toEqual({
       Link: `
-<presrc>; rel=preload; as="image"; fetchpriority="high"; imagesrcset="presrcset"; imagesizes="presizes",
- <src>; rel=preload; as="image"; imagesrcset="srcset"; imagesizes="sizes"
+<non-responsive-preload>; rel=preload; as="image"; fetchpriority="high", 
+<non-responsive-img>; rel=preload; as="image"; fetchpriority="high"
 `
         .replaceAll('\n', '')
         .trim(),
@@ -5851,7 +5853,6 @@ describe('ReactDOMFizzServer', () => {
           'If your `children` prop is using this form try rewriting it using a template string: ' +
           '<title>{`hello ${nameOfUser}`}</title>.\n' +
           '    in title (at **)\n' +
-          (gate('enableOwnerStacks') ? '' : '    in head (at **)\n') +
           '    in App (at **)',
       ]);
 
@@ -5897,7 +5898,6 @@ describe('ReactDOMFizzServer', () => {
           'React Component try moving the <title> tag into that component. ' +
           'If the `children` of <title> is some HTML markup change it to be Text only to be valid HTML.\n' +
           '    in title (at **)\n' +
-          (gate('enableOwnerStacks') ? '' : '    in head (at **)\n') +
           '    in App (at **)',
       ]);
       // object titles are toStringed when float is on
@@ -5941,7 +5941,6 @@ describe('ReactDOMFizzServer', () => {
           'string or number value if so. Otherwise implement a `toString` method that React can ' +
           'use to produce a valid <title>.\n' +
           '    in title (at **)\n' +
-          (gate('enableOwnerStacks') ? '' : '    in head (at **)\n') +
           '    in App (at **)',
       ]);
       // object titles are toStringed when float is on
@@ -6525,23 +6524,11 @@ describe('ReactDOMFizzServer', () => {
 
     assertConsoleErrorDev([
       'A script element was rendered with a number for children. If script element has children it must be a single string. Consider using dangerouslySetInnerHTML or passing a plain string as children.' +
-        componentStack(
-          gate(flags => flags.enableOwnerStacks)
-            ? ['script', 'App']
-            : ['script', 'body', 'html', 'App'],
-        ),
+        componentStack(['script', 'App']),
       'A script element was rendered with an array for children. If script element has children it must be a single string. Consider using dangerouslySetInnerHTML or passing a plain string as children.' +
-        componentStack(
-          gate(flags => flags.enableOwnerStacks)
-            ? ['script', 'App']
-            : ['script', 'body', 'html', 'App'],
-        ),
+        componentStack(['script', 'App']),
       'A script element was rendered with something unexpected for children. If script element has children it must be a single string. Consider using dangerouslySetInnerHTML or passing a plain string as children.' +
-        componentStack(
-          gate(flags => flags.enableOwnerStacks)
-            ? ['script', 'App']
-            : ['script', 'body', 'html', 'App'],
-        ),
+        componentStack(['script', 'App']),
     ]);
   });
 
@@ -8524,7 +8511,7 @@ describe('ReactDOMFizzServer', () => {
     expect(document.body.textContent).toBe('HelloWorld');
   });
 
-  // @gate __DEV__ && enableOwnerStacks
+  // @gate __DEV__
   it('can get the component owner stacks during rendering in dev', async () => {
     let stack;
 
@@ -8557,7 +8544,7 @@ describe('ReactDOMFizzServer', () => {
     );
   });
 
-  // @gate __DEV__ && enableOwnerStacks
+  // @gate __DEV__
   it('can get the component owner stacks for onError in dev', async () => {
     const thrownError = new Error('hi');
     let caughtError;
@@ -9091,56 +9078,30 @@ describe('ReactDOMFizzServer', () => {
         </body>
       </html>,
     );
-    if (gate(flags => flags.enableOwnerStacks)) {
-      assertConsoleErrorDev([
-        [
-          'Cannot render a <meta> outside the main document if it has an `itemProp` prop. `itemProp` suggests the tag belongs to an `itemScope` which can appear anywhere in the DOM. If you were intending for React to hoist this <meta> remove the `itemProp` prop. Otherwise, try moving this tag into the <head> or <body> of the Document.',
-          {withoutStack: true},
-        ],
-        'In HTML, <meta> cannot be a child of <html>.\nThis will cause a hydration error.' +
-          '\n' +
-          '\n  <App>' +
-          '\n>   <html>' +
-          '\n      <Suspense fallback="this fallb...">' +
-          '\n        <meta>' +
-          '\n>       <meta itemProp="" content="before">' +
-          '\n      ...' +
-          '\n' +
-          '\n    in meta (at **)' +
-          '\n    in App (at **)',
-        '<html> cannot contain a nested <meta>.\nSee this log for the ancestor stack trace.' +
-          '\n    in html (at **)' +
-          '\n    in App (at **)',
-        [
-          'Cannot render a <meta> outside the main document if it has an `itemProp` prop. `itemProp` suggests the tag belongs to an `itemScope` which can appear anywhere in the DOM. If you were intending for React to hoist this <meta> remove the `itemProp` prop. Otherwise, try moving this tag into the <head> or <body> of the Document.',
-          {withoutStack: true},
-        ],
-      ]);
-    } else {
-      assertConsoleErrorDev([
-        'Cannot render a <meta> outside the main document if it has an `itemProp` prop. `itemProp` suggests the tag belongs to an `itemScope` which can appear anywhere in the DOM. If you were intending for React to hoist this <meta> remove the `itemProp` prop. Otherwise, try moving this tag into the <head> or <body> of the Document.' +
-          '\n    in Suspense (at **)' +
-          '\n    in html (at **)' +
-          '\n    in App (at **)',
-        'In HTML, <meta> cannot be a child of <html>.\nThis will cause a hydration error.' +
-          '\n' +
-          '\n  <App>' +
-          '\n>   <html>' +
-          '\n      <Suspense fallback="this fallb...">' +
-          '\n        <meta>' +
-          '\n>       <meta itemProp="" content="before">' +
-          '\n      ...' +
-          '\n' +
-          '\n    in meta (at **)' +
-          '\n    in Suspense (at **)' +
-          '\n    in html (at **)' +
-          '\n    in App (at **)',
-        'Cannot render a <meta> outside the main document if it has an `itemProp` prop. `itemProp` suggests the tag belongs to an `itemScope` which can appear anywhere in the DOM. If you were intending for React to hoist this <meta> remove the `itemProp` prop. Otherwise, try moving this tag into the <head> or <body> of the Document.' +
-          '\n    in Suspense (at **)' +
-          '\n    in html (at **)' +
-          '\n    in App (at **)',
-      ]);
-    }
+    assertConsoleErrorDev([
+      [
+        'Cannot render a <meta> outside the main document if it has an `itemProp` prop. `itemProp` suggests the tag belongs to an `itemScope` which can appear anywhere in the DOM. If you were intending for React to hoist this <meta> remove the `itemProp` prop. Otherwise, try moving this tag into the <head> or <body> of the Document.',
+        {withoutStack: true},
+      ],
+      'In HTML, <meta> cannot be a child of <html>.\nThis will cause a hydration error.' +
+        '\n' +
+        '\n  <App>' +
+        '\n>   <html>' +
+        '\n      <Suspense fallback="this fallb...">' +
+        '\n        <meta>' +
+        '\n>       <meta itemProp="" content="before">' +
+        '\n      ...' +
+        '\n' +
+        '\n    in meta (at **)' +
+        '\n    in App (at **)',
+      '<html> cannot contain a nested <meta>.\nSee this log for the ancestor stack trace.' +
+        '\n    in html (at **)' +
+        '\n    in App (at **)',
+      [
+        'Cannot render a <meta> outside the main document if it has an `itemProp` prop. `itemProp` suggests the tag belongs to an `itemScope` which can appear anywhere in the DOM. If you were intending for React to hoist this <meta> remove the `itemProp` prop. Otherwise, try moving this tag into the <head> or <body> of the Document.',
+        {withoutStack: true},
+      ],
+    ]);
 
     await root.unmount();
     expect(getVisibleChildren(document)).toEqual(
@@ -9233,56 +9194,30 @@ describe('ReactDOMFizzServer', () => {
         </body>
       </html>,
     );
-    if (gate(flags => flags.enableOwnerStacks)) {
-      assertConsoleErrorDev([
-        [
-          'Cannot render a <meta> outside the main document if it has an `itemProp` prop. `itemProp` suggests the tag belongs to an `itemScope` which can appear anywhere in the DOM. If you were intending for React to hoist this <meta> remove the `itemProp` prop. Otherwise, try moving this tag into the <head> or <body> of the Document.',
-          {withoutStack: true},
-        ],
-        'In HTML, <meta> cannot be a child of <html>.\nThis will cause a hydration error.' +
-          '\n' +
-          '\n  <App>' +
-          '\n>   <html>' +
-          '\n      <Suspense fallback="this fallb...">' +
-          '\n        <meta>' +
-          '\n>       <meta itemProp="" content="before">' +
-          '\n      ...' +
-          '\n' +
-          '\n    in meta (at **)' +
-          '\n    in App (at **)',
-        '<html> cannot contain a nested <meta>.\nSee this log for the ancestor stack trace.' +
-          '\n    in html (at **)' +
-          '\n    in App (at **)',
-        [
-          'Cannot render a <meta> outside the main document if it has an `itemProp` prop. `itemProp` suggests the tag belongs to an `itemScope` which can appear anywhere in the DOM. If you were intending for React to hoist this <meta> remove the `itemProp` prop. Otherwise, try moving this tag into the <head> or <body> of the Document.',
-          {withoutStack: true},
-        ],
-      ]);
-    } else {
-      assertConsoleErrorDev([
-        'Cannot render a <meta> outside the main document if it has an `itemProp` prop. `itemProp` suggests the tag belongs to an `itemScope` which can appear anywhere in the DOM. If you were intending for React to hoist this <meta> remove the `itemProp` prop. Otherwise, try moving this tag into the <head> or <body> of the Document.' +
-          '\n    in Suspense (at **)' +
-          '\n    in html (at **)' +
-          '\n    in App (at **)',
-        'In HTML, <meta> cannot be a child of <html>.\nThis will cause a hydration error.' +
-          '\n' +
-          '\n  <App>' +
-          '\n>   <html>' +
-          '\n      <Suspense fallback="this fallb...">' +
-          '\n        <meta>' +
-          '\n>       <meta itemProp="" content="before">' +
-          '\n      ...' +
-          '\n' +
-          '\n    in meta (at **)' +
-          '\n    in Suspense (at **)' +
-          '\n    in html (at **)' +
-          '\n    in App (at **)',
-        'Cannot render a <meta> outside the main document if it has an `itemProp` prop. `itemProp` suggests the tag belongs to an `itemScope` which can appear anywhere in the DOM. If you were intending for React to hoist this <meta> remove the `itemProp` prop. Otherwise, try moving this tag into the <head> or <body> of the Document.' +
-          '\n    in Suspense (at **)' +
-          '\n    in html (at **)' +
-          '\n    in App (at **)',
-      ]);
-    }
+    assertConsoleErrorDev([
+      [
+        'Cannot render a <meta> outside the main document if it has an `itemProp` prop. `itemProp` suggests the tag belongs to an `itemScope` which can appear anywhere in the DOM. If you were intending for React to hoist this <meta> remove the `itemProp` prop. Otherwise, try moving this tag into the <head> or <body> of the Document.',
+        {withoutStack: true},
+      ],
+      'In HTML, <meta> cannot be a child of <html>.\nThis will cause a hydration error.' +
+        '\n' +
+        '\n  <App>' +
+        '\n>   <html>' +
+        '\n      <Suspense fallback="this fallb...">' +
+        '\n        <meta>' +
+        '\n>       <meta itemProp="" content="before">' +
+        '\n      ...' +
+        '\n' +
+        '\n    in meta (at **)' +
+        '\n    in App (at **)',
+      '<html> cannot contain a nested <meta>.\nSee this log for the ancestor stack trace.' +
+        '\n    in html (at **)' +
+        '\n    in App (at **)',
+      [
+        'Cannot render a <meta> outside the main document if it has an `itemProp` prop. `itemProp` suggests the tag belongs to an `itemScope` which can appear anywhere in the DOM. If you were intending for React to hoist this <meta> remove the `itemProp` prop. Otherwise, try moving this tag into the <head> or <body> of the Document.',
+        {withoutStack: true},
+      ],
+    ]);
 
     await root.unmount();
     expect(getVisibleChildren(document)).toEqual(
@@ -10298,7 +10233,7 @@ describe('ReactDOMFizzServer', () => {
           '\n+         client' +
           '\n-         server' +
           '\n' +
-          '\n    in Suspense (at **)' +
+          '\n    in meta (at **)' +
           '\n    in ClientApp (at **)',
       ]);
     }
