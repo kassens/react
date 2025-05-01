@@ -7,13 +7,13 @@
 import type {ESLint, Linter, Rule} from 'eslint';
 
 import ExhaustiveDeps from './rules/ExhaustiveDeps';
-import ReactCompiler from './rules/ReactCompiler';
+// import ReactCompiler from './rules/ReactCompiler';
 import RulesOfHooks from './rules/RulesOfHooks';
 
 // All rules
 const rules = {
   'exhaustive-deps': ExhaustiveDeps,
-  'react-compiler': ReactCompiler,
+  // 'react-compiler': ReactCompiler,
   'rules-of-hooks': RulesOfHooks,
 } satisfies Record<string, Rule.RuleModule>;
 
