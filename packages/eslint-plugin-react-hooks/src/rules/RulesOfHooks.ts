@@ -218,7 +218,7 @@ const rule = {
       //
       // Everything is ok if all React Hooks are both reachable from the initial
       // segment and reachable from every final segment.
-      onCodePathEnd(codePath, codePathNode) {
+      onCodePathEnd(codePath: any, codePathNode: Node) {
         const reactHooksMap = codePathReactHooksMapStack.pop();
         if (reactHooksMap?.size === 0) {
           return;
