@@ -3,11 +3,13 @@
 // Shared implementation and constants between the inline script and external
 // runtime instruction sets.
 
-export const COMMENT_NODE = 8;
-export const SUSPENSE_START_DATA = '$';
-export const SUSPENSE_END_DATA = '/$';
-export const SUSPENSE_PENDING_START_DATA = '$?';
-export const SUSPENSE_FALLBACK_START_DATA = '$!';
+const COMMENT_NODE = 8;
+const ACTIVITY_START_DATA = '&';
+const ACTIVITY_END_DATA = '/&';
+const SUSPENSE_START_DATA = '$';
+const SUSPENSE_END_DATA = '/$';
+const SUSPENSE_PENDING_START_DATA = '$?';
+const SUSPENSE_FALLBACK_START_DATA = '$!';
 
 // TODO: Symbols that are referenced outside this module use dynamic accessor
 // notation instead of dot notation to prevent Closure's advanced compilation
@@ -47,6 +49,12 @@ export function clientRenderBoundary(
 
 export function completeBoundary(suspenseBoundaryID, contentID, errorDigest) {
   const contentNode = document.getElementById(contentID);
+  if (!contentNode) {
+    // If the client has failed hydration we may have already deleted the streaming
+    // segments. The server may also have emitted a complete instruction but cancelled
+    // the segment. Regardless we can ignore this case.
+    return;
+  }
   // We'll detach the content node so that regardless of what happens next we don't leave in the tree.
   // This might also help by not causing recalcing each time we move a child from here to the target.
   contentNode.parentNode.removeChild(contentNode);
@@ -74,7 +82,7 @@ export function completeBoundary(suspenseBoundaryID, contentID, errorDigest) {
     do {
       if (node && node.nodeType === COMMENT_NODE) {
         const data = node.data;
-        if (data === SUSPENSE_END_DATA) {
+        if (data === SUSPENSE_END_DATA || data === ACTIVITY_END_DATA) {
           if (depth === 0) {
             break;
           } else {
@@ -83,7 +91,8 @@ export function completeBoundary(suspenseBoundaryID, contentID, errorDigest) {
         } else if (
           data === SUSPENSE_START_DATA ||
           data === SUSPENSE_PENDING_START_DATA ||
-          data === SUSPENSE_FALLBACK_START_DATA
+          data === SUSPENSE_FALLBACK_START_DATA ||
+          data === ACTIVITY_START_DATA
         ) {
           depth++;
         }

@@ -24,12 +24,12 @@ export const {
   enableHiddenSubtreeInsertionEffectCleanup,
   enablePersistedModeClonedFlag,
   enableShallowPropDiffing,
-  enableUseEffectCRUDOverload,
   passChildrenWhenCloningPersistedNodes,
   enableSiblingPrerendering,
   enableFastAddPropertiesInDiffing,
   enableLazyPublicInstanceInFabric,
   renameElementSymbol,
+  enableFragmentRefs,
 } = dynamicFlags;
 
 // The rest of the flags are static for better dead code elimination.
@@ -80,9 +80,11 @@ export const enableHydrationLaneScheduling = true;
 export const enableYieldingBeforePassive = false;
 export const enableThrottledScheduling = false;
 export const enableViewTransition = false;
-export const enableSwipeTransition = false;
+export const enableGestureTransition = false;
 export const enableScrollEndPolyfill = true;
-export const enableFragmentRefs = false;
+export const enableSuspenseyImages = false;
+export const enableSrcObject = false;
+export const ownerStackLimit = 1e4;
 
 // Flow magic to verify the exports of this file match the original version.
 ((((null: any): ExportsType): FeatureFlagsType): ExportsType);

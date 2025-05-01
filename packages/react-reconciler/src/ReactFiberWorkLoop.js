@@ -12,22 +12,27 @@ import {REACT_STRICT_MODE_TYPE} from 'shared/ReactSymbols';
 import type {Wakeable, Thenable} from 'shared/ReactTypes';
 import type {Fiber, FiberRoot} from './ReactInternalTypes';
 import type {Lanes, Lane} from './ReactFiberLane';
+import type {ActivityState} from './ReactFiberActivityComponent';
 import type {SuspenseState} from './ReactFiberSuspenseComponent';
 import type {FunctionComponentUpdateQueue} from './ReactFiberHooks';
+import type {Transition} from 'react/src/ReactStartTransition';
 import type {
   PendingTransitionCallbacks,
   PendingBoundaries,
-  Transition,
   TransitionAbort,
 } from './ReactFiberTracingMarkerComponent';
-import type {OffscreenInstance} from './ReactFiberActivityComponent';
-import type {Resource, ViewTransitionInstance} from './ReactFiberConfig';
+import type {OffscreenInstance} from './ReactFiberOffscreenComponent';
+import type {
+  Resource,
+  ViewTransitionInstance,
+  RunningViewTransition,
+} from './ReactFiberConfig';
 import type {RootState} from './ReactFiberRoot';
 import {
   getViewTransitionName,
   type ViewTransitionState,
 } from './ReactFiberViewTransitionComponent';
-import type {TransitionTypes} from 'react/src/ReactTransitionType.js';
+import type {TransitionTypes} from 'react/src/ReactTransitionType';
 
 import {
   enableCreateEventHandleAPI,
@@ -47,8 +52,9 @@ import {
   enableYieldingBeforePassive,
   enableThrottledScheduling,
   enableViewTransition,
-  enableSwipeTransition,
+  enableGestureTransition,
 } from 'shared/ReactFeatureFlags';
+import {resetOwnerStackLimit} from 'shared/ReactOwnerStackReset';
 import ReactSharedInternals from 'shared/ReactSharedInternals';
 import is from 'shared/objectIs';
 
@@ -101,6 +107,7 @@ import {
   trackSchedulerEvent,
   startViewTransition,
   startGestureTransition,
+  stopViewTransition,
   createViewTransitionInstance,
 } from './ReactFiberConfig';
 
@@ -118,6 +125,7 @@ import {
 import {
   HostRoot,
   ClassComponent,
+  ActivityComponent,
   SuspenseComponent,
   SuspenseListComponent,
   OffscreenComponent,
@@ -256,6 +264,7 @@ import {
 import {
   blockingClampTime,
   blockingUpdateTime,
+  blockingUpdateTask,
   blockingEventTime,
   blockingEventType,
   blockingEventIsRepeat,
@@ -264,6 +273,7 @@ import {
   transitionClampTime,
   transitionStartTime,
   transitionUpdateTime,
+  transitionUpdateTask,
   transitionEventTime,
   transitionEventType,
   transitionEventIsRepeat,
@@ -352,6 +362,7 @@ import {
   deleteScheduledGesture,
   stopCompletedGestures,
 } from './ReactFiberGestureScheduler';
+import {claimQueuedTransitionTypes} from './ReactFiberTransitionTypes';
 
 const PossiblyWeakMap = typeof WeakMap === 'function' ? WeakMap : Map;
 
@@ -664,6 +675,7 @@ let pendingEffectsRemainingLanes: Lanes = NoLanes;
 let pendingEffectsRenderEndTime: number = -0; // Profiling-only
 let pendingPassiveTransitions: Array<Transition> | null = null;
 let pendingRecoverableErrors: null | Array<CapturedValue<mixed>> = null;
+let pendingViewTransition: null | RunningViewTransition = null;
 let pendingViewTransitionEvents: Array<(types: Array<string>) => void> | null =
   null;
 let pendingTransitionTypes: null | TransitionTypes = null;
@@ -746,6 +758,16 @@ export function requestUpdateLane(fiber: Fiber): Lane {
 
   const transition = requestCurrentTransition();
   if (transition !== null) {
+    if (enableGestureTransition) {
+      if (transition.gesture) {
+        throw new Error(
+          'Cannot setState on regular state inside a startGestureTransition. ' +
+            'Gestures can only update the useOptimistic() hook. There should be no ' +
+            'side-effects associated with starting a Gesture until its Action is ' +
+            'invoked. Move side-effects to the Action instead.',
+        );
+      }
+    }
     if (__DEV__) {
       if (!transition._updatedFibers) {
         transition._updatedFibers = new Set();
@@ -920,8 +942,6 @@ export function scheduleUpdateOnFiber(
           transition.startTime = now();
         }
 
-        // $FlowFixMe[prop-missing]: The BatchConfigTransition and Transition types are incompatible but was previously untyped and thus uncaught
-        // $FlowFixMe[incompatible-call]: "
         addTransitionToLanesMap(root, transition, lane);
       }
     }
@@ -1436,7 +1456,7 @@ function commitRootWhenReady(
   const subtreeFlags = finishedWork.subtreeFlags;
   const isViewTransitionEligible =
     enableViewTransition && includesOnlyViewTransitionEligibleLanes(lanes); // TODO: Use a subtreeFlag to optimize.
-  const isGestureTransition = enableSwipeTransition && isGestureRender(lanes);
+  const isGestureTransition = enableGestureTransition && isGestureRender(lanes);
   const maySuspendCommit =
     subtreeFlags & ShouldSuspendCommit ||
     (subtreeFlags & BothVisibilityAndMaySuspendCommit) ===
@@ -1451,11 +1471,11 @@ function commitRootWhenReady(
     // transaction, so it track state in its own module scope.
     // This will also track any newly added or appearing ViewTransition
     // components for the purposes of forming pairs.
-    accumulateSuspenseyCommit(finishedWork);
+    accumulateSuspenseyCommit(finishedWork, lanes);
     if (isViewTransitionEligible || isGestureTransition) {
       // If we're stopping gestures we don't have to wait for any pending
       // view transition. We'll stop it when we commit.
-      if (!enableSwipeTransition || root.stoppingGestures === null) {
+      if (!enableGestureTransition || root.stoppingGestures === null) {
         suspendOnActiveViewTransition(root.containerInfo);
       }
     }
@@ -1896,6 +1916,7 @@ function prepareFreshStack(root: FiberRoot, lanes: Lanes): Fiber {
         blockingSpawnedUpdate,
         renderStartTime,
         lanes,
+        blockingUpdateTask,
       );
       clearBlockingTimers();
     }
@@ -1932,6 +1953,7 @@ function prepareFreshStack(root: FiberRoot, lanes: Lanes): Fiber {
         transitionEventType,
         transitionEventIsRepeat,
         renderStartTime,
+        transitionUpdateTask,
       );
       clearTransitionTimers();
     }
@@ -1984,6 +2006,8 @@ function prepareFreshStack(root: FiberRoot, lanes: Lanes): Fiber {
   finishQueueingConcurrentUpdates();
 
   if (__DEV__) {
+    resetOwnerStackLimit();
+
     ReactStrictModeWarnings.discardPendingWarnings();
   }
 
@@ -2620,7 +2644,7 @@ function renderRootConcurrent(root: FiberRoot, lanes: Lanes) {
                 const props = hostFiber.pendingProps;
                 const isReady = resource
                   ? preloadResource(resource)
-                  : preloadInstance(type, props);
+                  : preloadInstance(hostFiber.stateNode, type, props);
                 if (isReady) {
                   // The data resolved. Resume the work loop as if nothing
                   // suspended. Unlike when a user component suspends, we don't
@@ -3280,7 +3304,7 @@ function commitRoot(
     if (enableSchedulingProfiler) {
       markCommitStopped();
     }
-    if (enableSwipeTransition) {
+    if (enableGestureTransition) {
       // Stop any gestures that were completed and is now being reverted.
       if (root.stoppingGestures !== null) {
         stopCompletedGestures(root);
@@ -3314,7 +3338,7 @@ function commitRoot(
   const concurrentlyUpdatedLanes = getConcurrentlyUpdatedLanes();
   remainingLanes = mergeLanes(remainingLanes, concurrentlyUpdatedLanes);
 
-  if (enableSwipeTransition && root.pendingGestures === null) {
+  if (enableGestureTransition && root.pendingGestures === null) {
     // Gestures don't clear their lanes while the gesture is still active but it
     // might not be scheduled to do any more renders and so we shouldn't schedule
     // any more gesture lane work until a new gesture is scheduled.
@@ -3362,7 +3386,7 @@ function commitRoot(
     pendingSuspendedCommitReason = suspendedCommitReason;
   }
 
-  if (enableSwipeTransition && isGestureRender(lanes)) {
+  if (enableGestureTransition && isGestureRender(lanes)) {
     // This is a special kind of render that doesn't commit regular effects.
     commitGestureOnRoot(
       root,
@@ -3387,11 +3411,7 @@ function commitRoot(
     pendingViewTransitionEvents = null;
     if (includesOnlyViewTransitionEligibleLanes(lanes)) {
       // Claim any pending Transition Types for this commit.
-      // This means that multiple roots committing independent View Transitions
-      // 1) end up staggered because we can only have one at a time.
-      // 2) only the first one gets all the Transition Types.
-      pendingTransitionTypes = ReactSharedInternals.V;
-      ReactSharedInternals.V = null;
+      pendingTransitionTypes = claimQueuedTransitionTypes(root);
       passiveSubtreeMask = PassiveTransitionMask;
     } else {
       pendingTransitionTypes = null;
@@ -3488,7 +3508,7 @@ function commitRoot(
   }
 
   let willStartViewTransition = shouldStartViewTransition;
-  if (enableSwipeTransition) {
+  if (enableGestureTransition) {
     // Stop any gestures that were completed and is now being committed.
     if (root.stoppingGestures !== null) {
       stopCompletedGestures(root);
@@ -3500,10 +3520,8 @@ function commitRoot(
   }
 
   pendingEffectsStatus = PENDING_MUTATION_PHASE;
-  const startedViewTransition =
-    enableViewTransition &&
-    willStartViewTransition &&
-    startViewTransition(
+  if (enableViewTransition && willStartViewTransition) {
+    pendingViewTransition = startViewTransition(
       root.containerInfo,
       pendingTransitionTypes,
       flushMutationEffects,
@@ -3513,7 +3531,7 @@ function commitRoot(
       flushPassiveEffects,
       reportViewTransitionError,
     );
-  if (!startedViewTransition) {
+  } else {
     // Flush synchronously.
     flushMutationEffects();
     flushLayoutEffects();
@@ -3642,6 +3660,8 @@ function flushSpawnedWork(): void {
     return;
   }
   pendingEffectsStatus = NO_PENDING_EFFECTS;
+
+  pendingViewTransition = null; // The view transition has now fully started.
 
   // Tell Scheduler to yield at the end of the frame, so the browser has an
   // opportunity to paint.
@@ -3908,17 +3928,14 @@ function commitGestureOnRoot(
     setCurrentUpdatePriority(previousPriority);
     ReactSharedInternals.T = prevTransition;
   }
-  // TODO: Collect transition types.
-  pendingTransitionTypes = null;
+  pendingTransitionTypes = finishedGesture.types;
   pendingEffectsStatus = PENDING_GESTURE_MUTATION_PHASE;
 
-  finishedGesture.running = startGestureTransition(
+  pendingViewTransition = finishedGesture.running = startGestureTransition(
     root.containerInfo,
     finishedGesture.provider,
-    finishedGesture.rangeCurrent,
-    finishedGesture.direction
-      ? finishedGesture.rangeNext
-      : finishedGesture.rangePrevious,
+    finishedGesture.rangeStart,
+    finishedGesture.rangeEnd,
     pendingTransitionTypes,
     flushGestureMutations,
     flushGestureAnimations,
@@ -3927,7 +3944,7 @@ function commitGestureOnRoot(
 }
 
 function flushGestureMutations(): void {
-  if (!enableSwipeTransition) {
+  if (!enableGestureTransition) {
     return;
   }
   if (pendingEffectsStatus !== PENDING_GESTURE_MUTATION_PHASE) {
@@ -3956,7 +3973,7 @@ function flushGestureMutations(): void {
 }
 
 function flushGestureAnimations(): void {
-  if (!enableSwipeTransition) {
+  if (!enableGestureTransition) {
     return;
   }
   // If we get canceled before we start we might not have applied
@@ -3971,6 +3988,8 @@ function flushGestureAnimations(): void {
   pendingEffectsRoot = (null: any); // Clear for GC purposes.
   pendingFinishedWork = (null: any); // Clear for GC purposes.
   pendingEffectsLanes = NoLanes;
+
+  pendingViewTransition = null; // The view transition has now fully started.
 
   const prevTransition = ReactSharedInternals.T;
   ReactSharedInternals.T = null;
@@ -4022,8 +4041,27 @@ function releaseRootPooledCache(root: FiberRoot, remainingLanes: Lanes) {
   }
 }
 
+let didWarnAboutInterruptedViewTransitions = false;
+
 export function flushPendingEffects(wasDelayedCommit?: boolean): boolean {
   // Returns whether passive effects were flushed.
+  if (enableViewTransition && pendingViewTransition !== null) {
+    // If we forced a flush before the View Transition full started then we skip it.
+    // This ensures that we're not running a partial animation.
+    stopViewTransition(pendingViewTransition);
+    if (__DEV__) {
+      if (!didWarnAboutInterruptedViewTransitions) {
+        didWarnAboutInterruptedViewTransitions = true;
+        console.warn(
+          'A flushSync update cancelled a View Transition because it was called ' +
+            'while the View Transition was still preparing. To preserve the synchronous ' +
+            'semantics, React had to skip the View Transition. If you can, try to avoid ' +
+            "flushSync() in a scenario that's likely to interfere.",
+        );
+      }
+    }
+    pendingViewTransition = null;
+  }
   flushGestureMutations();
   flushGestureAnimations();
   flushMutationEffects();
@@ -4457,9 +4495,11 @@ export function resolveRetryWakeable(boundaryFiber: Fiber, wakeable: Wakeable) {
   let retryLane: Lane = NoLane; // Default
   let retryCache: WeakSet<Wakeable> | Set<Wakeable> | null;
   switch (boundaryFiber.tag) {
+    case ActivityComponent:
     case SuspenseComponent:
       retryCache = boundaryFiber.stateNode;
-      const suspenseState: null | SuspenseState = boundaryFiber.memoizedState;
+      const suspenseState: null | SuspenseState | ActivityState =
+        boundaryFiber.memoizedState;
       if (suspenseState !== null) {
         retryLane = suspenseState.retryLane;
       }

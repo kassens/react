@@ -3580,7 +3580,8 @@ describe('ReactDOMFizzServer', () => {
     expect(document.head.innerHTML).toBe(
       '<script type="importmap">' +
         JSON.stringify(importMap) +
-        '</script><script async="" src="foo"></script>',
+        '</script><script async="" src="foo"></script>' +
+        '<link rel="expect" href="#«R»" blocking="render">',
     );
   });
 
@@ -4189,7 +4190,7 @@ describe('ReactDOMFizzServer', () => {
         renderOptions.unstable_externalRuntimeSrc,
       ).map(n => n.outerHTML),
     ).toEqual([
-      '<script src="foo" async=""></script>',
+      '<script src="foo" id="«R»" async=""></script>',
       '<script src="bar" async=""></script>',
       '<script src="baz" integrity="qux" async=""></script>',
       '<script type="module" src="quux" async=""></script>',
@@ -4276,7 +4277,7 @@ describe('ReactDOMFizzServer', () => {
         renderOptions.unstable_externalRuntimeSrc,
       ).map(n => n.outerHTML),
     ).toEqual([
-      '<script src="foo" async=""></script>',
+      '<script src="foo" id="«R»" async=""></script>',
       '<script src="bar" async=""></script>',
       '<script src="baz" crossorigin="" async=""></script>',
       '<script src="qux" crossorigin="" async=""></script>',
@@ -4512,7 +4513,7 @@ describe('ReactDOMFizzServer', () => {
 
     // the html should be as-is
     expect(document.documentElement.innerHTML).toEqual(
-      '<head></head><body><p>hello world!</p></body>',
+      '<head><link rel="expect" href="#«R»" blocking="render"></head><body><p>hello world!</p><template id="«R»"></template></body>',
     );
   });
 
@@ -4664,7 +4665,7 @@ describe('ReactDOMFizzServer', () => {
     // client-side rendering.
     await clientResolve();
     await waitForAll([
-      "onRecoverableError: Hydration failed because the server rendered HTML didn't match the client.",
+      "onRecoverableError: Hydration failed because the server rendered text didn't match the client.",
     ]);
     expect(getVisibleChildren(container)).toEqual(
       <div>
@@ -4712,7 +4713,7 @@ describe('ReactDOMFizzServer', () => {
       },
     });
     await waitForAll([
-      "onRecoverableError: Hydration failed because the server rendered HTML didn't match the client.",
+      "onRecoverableError: Hydration failed because the server rendered text didn't match the client.",
     ]);
 
     expect(getVisibleChildren(container)).toEqual(
@@ -6492,7 +6493,7 @@ describe('ReactDOMFizzServer', () => {
     });
 
     expect(document.documentElement.outerHTML).toEqual(
-      '<html><head></head><body><script>try { foo() } catch (e) {} ;</script></body></html>',
+      '<html><head><link rel="expect" href="#«R»" blocking="render"></head><body><script>try { foo() } catch (e) {} ;</script><template id="«R»"></template></body></html>',
     );
   });
 
@@ -10179,7 +10180,7 @@ describe('ReactDOMFizzServer', () => {
       );
       expect(recoverableErrors).toEqual([
         expect.stringContaining(
-          "Hydration failed because the server rendered HTML didn't match the client.",
+          "Hydration failed because the server rendered text didn't match the client.",
         ),
       ]);
     } else {

@@ -1,11 +1,16 @@
 import React, {
+  unstable_addTransitionType as addTransitionType,
   unstable_ViewTransition as ViewTransition,
   unstable_Activity as Activity,
-  unstable_useSwipeTransition as useSwipeTransition,
+  useLayoutEffect,
   useEffect,
   useState,
   useId,
+  useOptimistic,
+  startTransition,
 } from 'react';
+
+import {createPortal} from 'react-dom';
 
 import SwipeRecognizer from './SwipeRecognizer';
 
@@ -32,10 +37,16 @@ const b = (
 function Component() {
   return (
     <ViewTransition
-      className={
+      default={
         transitions['enter-slide-right'] + ' ' + transitions['exit-slide-left']
       }>
       <p className="roboto-font">Slide In from Left, Slide Out to Right</p>
+      <p>
+        <img
+          src="https://react.dev/_next/image?url=%2Fimages%2Fteam%2Fsebmarkbage.jpg&w=3840&q=75"
+          width="300"
+        />
+      </p>
     </ViewTransition>
   );
 }
@@ -46,7 +57,12 @@ function Id() {
 }
 
 export default function Page({url, navigate}) {
-  const [renderedUrl, startGesture] = useSwipeTransition('/?a', url, '/?b');
+  const [renderedUrl, optimisticNavigate] = useOptimistic(
+    url,
+    (state, direction) => {
+      return direction === 'left' ? '/?a' : '/?b';
+    }
+  );
   const show = renderedUrl === '/?b';
   function onTransition(viewTransition, types) {
     const keyframes = [
@@ -68,16 +84,50 @@ export default function Page({url, navigate}) {
     return () => clearInterval(timer);
   }, []);
 
+  useLayoutEffect(() => {
+    // Calling a default update should not interrupt ViewTransitions but
+    // a flushSync will.
+    // Promise.resolve().then(() => {
+    //   flushSync(() => {
+    setCounter(c => c + 10);
+    //  });
+    // });
+  }, [show]);
+
+  const [showModal, setShowModal] = useState(false);
+  const portal = showModal ? (
+    createPortal(
+      <div className="portal">
+        Portal: {!show ? 'A' : 'B'}
+        <ViewTransition>
+          <div>{!show ? 'A' : 'B'}</div>
+        </ViewTransition>
+      </div>,
+      document.body
+    )
+  ) : (
+    <button onClick={() => startTransition(() => setShowModal(true))}>
+      Show Modal
+    </button>
+  );
+
   const exclamation = (
     <ViewTransition name="exclamation" onShare={onTransition}>
-      <span>!</span>
+      <span>
+        <div>!</div>
+      </span>
     </ViewTransition>
   );
   return (
     <div className="swipe-recognizer">
       <SwipeRecognizer
         action={swipeAction}
-        gesture={startGesture}
+        gesture={direction => {
+          addTransitionType(
+            direction === 'left' ? 'navigation-forward' : 'navigation-back'
+          );
+          optimisticNavigate(direction);
+        }}
         direction={show ? 'left' : 'right'}>
         <button
           className="button"
@@ -86,17 +136,17 @@ export default function Page({url, navigate}) {
           }}>
           {url === '/?b' ? 'Goto A' : 'Goto B'}
         </button>
-        <ViewTransition className="none">
+        <ViewTransition default="none">
           <div>
             <ViewTransition>
               <div>
-                <ViewTransition className={transitions['slide-on-nav']}>
+                <ViewTransition default={transitions['slide-on-nav']}>
                   <h1>{!show ? 'A' : 'B' + counter}</h1>
                 </ViewTransition>
               </div>
             </ViewTransition>
             <ViewTransition
-              className={{
+              default={{
                 'navigation-back': transitions['slide-right'],
                 'navigation-forward': transitions['slide-left'],
               }}>
@@ -142,6 +192,7 @@ export default function Page({url, navigate}) {
             <p>content</p>
             <p>out</p>
             <p>of</p>
+            {portal}
             <p>the</p>
             <p>viewport</p>
             {show ? <Component /> : null}

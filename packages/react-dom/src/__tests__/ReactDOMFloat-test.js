@@ -250,7 +250,10 @@ describe('ReactDOMFloat', () => {
             node.tagName !== 'TEMPLATE' &&
             node.tagName !== 'template' &&
             !node.hasAttribute('hidden') &&
-            !node.hasAttribute('aria-hidden'))
+            !node.hasAttribute('aria-hidden') &&
+            // Ignore the render blocking expect
+            (node.getAttribute('rel') !== 'expect' ||
+              node.getAttribute('blocking') !== 'render'))
         ) {
           const props = {};
           const attributes = node.attributes;
@@ -690,7 +693,9 @@ describe('ReactDOMFloat', () => {
       pipe(writable);
     });
     expect(chunks).toEqual([
-      '<!DOCTYPE html><html><head><script async="" src="foo"></script><title>foo</title></head><body>bar',
+      '<!DOCTYPE html><html><head><script async="" src="foo"></script>' +
+        '<link rel="expect" href="#«R»" blocking="render"/><title>foo</title></head>' +
+        '<body>bar<template id="«R»"></template>',
       '</body></html>',
     ]);
   });
@@ -3360,27 +3365,29 @@ body {
     });
     await waitForAll([]);
 
-    // Although the commit suspended, a preload was inserted.
-    expect(getMeaningfulChildren(document)).toEqual(
-      <html>
-        <head>
-          <link rel="preload" href="foo" as="style" />
-        </head>
-        <body>loading...</body>
-      </html>,
-    );
+    if (gate(flags => flags.alwaysThrottleRetries)) {
+      // Although the commit suspended, a preload was inserted.
+      expect(getMeaningfulChildren(document)).toEqual(
+        <html>
+          <head>
+            <link rel="preload" href="foo" as="style" />
+          </head>
+          <body>loading...</body>
+        </html>,
+      );
 
-    loadPreloads(['foo']);
-    assertLog(['load preload: foo']);
-    expect(getMeaningfulChildren(document)).toEqual(
-      <html>
-        <head>
-          <link rel="stylesheet" href="foo" data-precedence="default" />
-          <link rel="preload" href="foo" as="style" />
-        </head>
-        <body>loading...</body>
-      </html>,
-    );
+      loadPreloads(['foo']);
+      assertLog(['load preload: foo']);
+      expect(getMeaningfulChildren(document)).toEqual(
+        <html>
+          <head>
+            <link rel="stylesheet" href="foo" data-precedence="default" />
+            <link rel="preload" href="foo" as="style" />
+          </head>
+          <body>loading...</body>
+        </html>,
+      );
+    }
 
     loadStylesheets(['foo']);
     assertLog(['load stylesheet: foo']);
@@ -3410,35 +3417,36 @@ body {
       );
     });
     await waitForAll([]);
-    expect(getMeaningfulChildren(document)).toEqual(
-      <html>
-        <head>
-          <link rel="stylesheet" href="foo" data-precedence="default" />
-          <link rel="preload" href="foo" as="style" />
-          <link rel="preload" href="bar" as="style" />
-        </head>
-        <body>
-          <div style="display: none;">hello</div>loading...
-        </body>
-      </html>,
-    );
+    if (gate(flags => flags.alwaysThrottleRetries)) {
+      expect(getMeaningfulChildren(document)).toEqual(
+        <html>
+          <head>
+            <link rel="stylesheet" href="foo" data-precedence="default" />
+            <link rel="preload" href="foo" as="style" />
+            <link rel="preload" href="bar" as="style" />
+          </head>
+          <body>
+            <div style="display: none;">hello</div>loading...
+          </body>
+        </html>,
+      );
 
-    loadPreloads(['bar']);
-    assertLog(['load preload: bar']);
-    expect(getMeaningfulChildren(document)).toEqual(
-      <html>
-        <head>
-          <link rel="stylesheet" href="foo" data-precedence="default" />
-          <link rel="stylesheet" href="bar" data-precedence="default" />
-          <link rel="preload" href="foo" as="style" />
-          <link rel="preload" href="bar" as="style" />
-        </head>
-        <body>
-          <div style="display: none;">hello</div>loading...
-        </body>
-      </html>,
-    );
-
+      loadPreloads(['bar']);
+      assertLog(['load preload: bar']);
+      expect(getMeaningfulChildren(document)).toEqual(
+        <html>
+          <head>
+            <link rel="stylesheet" href="foo" data-precedence="default" />
+            <link rel="stylesheet" href="bar" data-precedence="default" />
+            <link rel="preload" href="foo" as="style" />
+            <link rel="preload" href="bar" as="style" />
+          </head>
+          <body>
+            <div style="display: none;">hello</div>loading...
+          </body>
+        </html>,
+      );
+    }
     loadStylesheets(['bar']);
     assertLog(['load stylesheet: bar']);
     expect(getMeaningfulChildren(document)).toEqual(

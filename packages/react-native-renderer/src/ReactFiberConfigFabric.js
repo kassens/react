@@ -18,10 +18,13 @@ import {
   NoEventPriority,
   DefaultEventPriority,
   DiscreteEventPriority,
+  ContinuousEventPriority,
+  IdleEventPriority,
   type EventPriority,
 } from 'react-reconciler/src/ReactEventPriorities';
 import type {Fiber} from 'react-reconciler/src/ReactInternalTypes';
 import {HostText} from 'react-reconciler/src/ReactWorkTags';
+import {traverseFragmentInstance} from 'react-reconciler/src/ReactFiberTreeReflection';
 
 // Modules provided by RN:
 import {
@@ -46,6 +49,8 @@ const {
   registerEventHandler,
   unstable_DefaultEventPriority: FabricDefaultPriority,
   unstable_DiscreteEventPriority: FabricDiscretePriority,
+  unstable_ContinuousEventPriority: FabricContinuousPriority,
+  unstable_IdleEventPriority: FabricIdlePriority,
   unstable_getCurrentEventPriority: fabricGetCurrentEventPriority,
 } = nativeFabricUIManager;
 
@@ -397,6 +402,10 @@ export function resolveUpdatePriority(): EventPriority {
     switch (currentEventPriority) {
       case FabricDiscretePriority:
         return DiscreteEventPriority;
+      case FabricContinuousPriority:
+        return ContinuousEventPriority;
+      case FabricIdlePriority:
+        return IdleEventPriority;
       case FabricDefaultPriority:
       default:
         return DefaultEventPriority;
@@ -577,13 +586,36 @@ export function maySuspendCommit(type: Type, props: Props): boolean {
   return false;
 }
 
-export function preloadInstance(type: Type, props: Props): boolean {
+export function maySuspendCommitOnUpdate(
+  type: Type,
+  oldProps: Props,
+  newProps: Props,
+): boolean {
+  return false;
+}
+
+export function maySuspendCommitInSyncRender(
+  type: Type,
+  props: Props,
+): boolean {
+  return false;
+}
+
+export function preloadInstance(
+  instance: Instance,
+  type: Type,
+  props: Props,
+): boolean {
   return true;
 }
 
 export function startSuspendingCommit(): void {}
 
-export function suspendInstance(type: Type, props: Props): void {}
+export function suspendInstance(
+  instance: Instance,
+  type: Type,
+  props: Props,
+): void {}
 
 export function suspendOnActiveViewTransition(container: Container): void {}
 
@@ -591,30 +623,91 @@ export function waitForCommitToBeReady(): null {
   return null;
 }
 
-export type FragmentInstanceType = null;
+export type FragmentInstanceType = {
+  _fragmentFiber: Fiber,
+  _observers: null | Set<IntersectionObserver>,
+  observeUsing: (observer: IntersectionObserver) => void,
+  unobserveUsing: (observer: IntersectionObserver) => void,
+};
+
+function FragmentInstance(this: FragmentInstanceType, fragmentFiber: Fiber) {
+  this._fragmentFiber = fragmentFiber;
+  this._observers = null;
+}
+
+// $FlowFixMe[prop-missing]
+FragmentInstance.prototype.observeUsing = function (
+  this: FragmentInstanceType,
+  observer: IntersectionObserver,
+): void {
+  if (this._observers === null) {
+    this._observers = new Set();
+  }
+  this._observers.add(observer);
+  traverseFragmentInstance(this._fragmentFiber, observeChild, observer);
+};
+function observeChild(instance: Instance, observer: IntersectionObserver) {
+  const publicInstance = getPublicInstance(instance);
+  if (publicInstance == null) {
+    throw new Error('Expected to find a host node. This is a bug in React.');
+  }
+  // $FlowFixMe[incompatible-call] Element types are behind a flag in RN
+  observer.observe(publicInstance);
+  return false;
+}
+// $FlowFixMe[prop-missing]
+FragmentInstance.prototype.unobserveUsing = function (
+  this: FragmentInstanceType,
+  observer: IntersectionObserver,
+): void {
+  if (this._observers === null || !this._observers.has(observer)) {
+    if (__DEV__) {
+      console.error(
+        'You are calling unobserveUsing() with an observer that is not being observed with this fragment ' +
+          'instance. First attach the observer with observeUsing()',
+      );
+    }
+  } else {
+    this._observers.delete(observer);
+    traverseFragmentInstance(this._fragmentFiber, unobserveChild, observer);
+  }
+};
+function unobserveChild(instance: Instance, observer: IntersectionObserver) {
+  const publicInstance = getPublicInstance(instance);
+  if (publicInstance == null) {
+    throw new Error('Expected to find a host node. This is a bug in React.');
+  }
+  // $FlowFixMe[incompatible-call] Element types are behind a flag in RN
+  observer.unobserve(publicInstance);
+  return false;
+}
 
 export function createFragmentInstance(
   fragmentFiber: Fiber,
 ): FragmentInstanceType {
-  return null;
+  return new (FragmentInstance: any)(fragmentFiber);
 }
 
 export function updateFragmentInstanceFiber(
   fragmentFiber: Fiber,
   instance: FragmentInstanceType,
 ): void {
-  // Noop
+  instance._fragmentFiber = fragmentFiber;
 }
 
 export function commitNewChildToFragmentInstance(
-  child: PublicInstance,
+  child: Instance,
   fragmentInstance: FragmentInstanceType,
 ): void {
-  // Noop
+  if (fragmentInstance._observers !== null) {
+    fragmentInstance._observers.forEach(observer => {
+      observeChild(child, observer);
+    });
+  }
 }
 
 export function deleteChildFromFragmentInstance(
-  child: PublicInstance,
+  child: Instance,
   fragmentInstance: FragmentInstanceType,
 ): void {
   // Noop

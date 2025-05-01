@@ -8,7 +8,13 @@
  */
 
 import type {Fiber} from './ReactInternalTypes';
-import type {Container, SuspenseInstance, Instance} from './ReactFiberConfig';
+import type {
+  Container,
+  ActivityInstance,
+  SuspenseInstance,
+  Instance,
+} from './ReactFiberConfig';
+import type {ActivityState} from './ReactFiberActivityComponent';
 import type {SuspenseState} from './ReactFiberSuspenseComponent';
 
 import {
@@ -18,6 +24,7 @@ import {
   HostRoot,
   HostPortal,
   HostText,
+  ActivityComponent,
   SuspenseComponent,
   OffscreenComponent,
 } from './ReactWorkTags';
@@ -71,6 +78,25 @@ export function getSuspenseInstanceFromFiber(
       return suspenseState.dehydrated;
     }
   }
+  return null;
+}
+
+export function getActivityInstanceFromFiber(
+  fiber: Fiber,
+): null | ActivityInstance {
+  if (fiber.tag === ActivityComponent) {
+    let activityState: ActivityState | null = fiber.memoizedState;
+    if (activityState === null) {
+      const current = fiber.alternate;
+      if (current !== null) {
+        activityState = current.memoizedState;
+      }
+    }
+    if (activityState !== null) {
+      return activityState.dehydrated;
+    }
+  }
+  // TODO: Implement this on ActivityComponent.
   return null;
 }
 
@@ -319,9 +345,9 @@ export function doesFiberContain(
   return false;
 }
 
-export function traverseFragmentInstance<A, B, C>(
+export function traverseFragmentInstance<I, A, B, C>(
   fragmentFiber: Fiber,
-  fn: (Instance, A, B, C) => boolean,
+  fn: (I, A, B, C) => boolean,
   a: A,
   b: B,
   c: C,
@@ -329,9 +355,9 @@ export function traverseFragmentInstance<A, B, C>(
   traverseFragmentInstanceChildren(fragmentFiber.child, fn, a, b, c);
 }
 
-function traverseFragmentInstanceChildren<A, B, C>(
+function traverseFragmentInstanceChildren<I, A, B, C>(
   child: Fiber | null,
-  fn: (Instance, A, B, C) => boolean,
+  fn: (I, A, B, C) => boolean,
   a: A,
   b: B,
   c: C,
@@ -351,4 +377,19 @@ function traverseFragmentInstanceChildren<A, B, C>(
     }
     child = child.sibling;
   }
+}
+
+export function getFragmentParentHostInstance(fiber: Fiber): null | Instance {
+  let parent = fiber.return;
+  while (parent !== null) {
+    if (parent.tag === HostRoot) {
+      return parent.stateNode.containerInfo;
+    }
+    if (parent.tag === HostComponent) {
+      return parent.stateNode;
+    }
+    parent = parent.return;
+  }
+
+  return null;
 }

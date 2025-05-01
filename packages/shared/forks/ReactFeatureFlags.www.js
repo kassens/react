@@ -28,7 +28,6 @@ export const {
   enableSiblingPrerendering,
   enableTransitionTracing,
   enableTrustedTypesIntegration,
-  enableUseEffectCRUDOverload,
   favorSafetyOverHydrationPerf,
   renameElementSymbol,
   retryLaneExpirationMs,
@@ -111,7 +110,12 @@ export const enableShallowPropDiffing = false;
 
 export const enableLazyPublicInstanceInFabric = false;
 
-export const enableSwipeTransition = false;
+export const enableGestureTransition = false;
+
+export const enableSuspenseyImages = false;
+export const enableSrcObject = false;
+
+export const ownerStackLimit = 1e4;
 
 // Flow magic to verify the exports of this file match the original version.
 ((((null: any): ExportsType): FeatureFlagsType): ExportsType);

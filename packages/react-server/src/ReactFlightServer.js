@@ -103,6 +103,7 @@ import {DefaultAsyncDispatcher} from './flight/ReactFlightAsyncDispatcher';
 import {resolveOwner, setCurrentOwner} from './flight/ReactFlightCurrentOwner';
 
 import {getOwnerStackByComponentInfoInDev} from 'shared/ReactComponentInfoStack';
+import {resetOwnerStackLimit} from 'shared/ReactOwnerStackReset';
 
 import {
   callComponentInDEV,
@@ -552,6 +553,10 @@ export function createRequest(
   environmentName: void | string | (() => string), // DEV-only
   filterStackFrame: void | ((url: string, functionName: string) => boolean), // DEV-only
 ): Request {
+  if (__DEV__) {
+    resetOwnerStackLimit();
+  }
+
   // $FlowFixMe[invalid-constructor]: the shapes are exact here but Flow doesn't like constructors
   return new RequestInstance(
     RENDER,
@@ -580,6 +585,10 @@ export function createPrerenderRequest(
   environmentName: void | string | (() => string), // DEV-only
   filterStackFrame: void | ((url: string, functionName: string) => boolean), // DEV-only
 ): Request {
+  if (__DEV__) {
+    resetOwnerStackLimit();
+  }
+
   // $FlowFixMe[invalid-constructor]: the shapes are exact here but Flow doesn't like constructors
   return new RequestInstance(
     PRERENDER,
@@ -759,10 +768,11 @@ function serializeReadableStream(
     }
 
     if (entry.done) {
-      request.abortListeners.delete(abortStream);
       const endStreamRow = streamTask.id.toString(16) + ':C\n';
       request.completedRegularChunks.push(stringToChunk(endStreamRow));
       enqueueFlush(request);
+      request.abortListeners.delete(abortStream);
+      callOnAllReadyIfReady(request);
       aborted = true;
     } else {
       try {
@@ -860,7 +870,6 @@ function serializeAsyncIterable(
     }
 
     if (entry.done) {
-      request.abortListeners.delete(abortIterable);
       let endStreamRow;
       if (entry.value === undefined) {
         endStreamRow = streamTask.id.toString(16) + ':C\n';
@@ -881,6 +890,8 @@ function serializeAsyncIterable(
       }
       request.completedRegularChunks.push(stringToChunk(endStreamRow));
       enqueueFlush(request);
+      request.abortListeners.delete(abortIterable);
+      callOnAllReadyIfReady(request);
       aborted = true;
     } else {
       try {
@@ -1588,6 +1599,29 @@ function renderClientElement(
 
 // The chunk ID we're currently rendering that we can assign debug data to.
 let debugID: null | number = null;
+
+// Approximate string length of the currently serializing row.
+// Used to power outlining heuristics.
+let serializedSize = 0;
+const MAX_ROW_SIZE = 3200;
+
+function deferTask(request: Request, task: Task): ReactJSONValue {
+  // Like outlineTask but instead the item is scheduled to be serialized
+  // after its parent in the stream.
+  const newTask = createTask(
+    request,
+    task.model, // the currently rendering element
+    task.keyPath, // unlike outlineModel this one carries along context
+    task.implicitSlot,
+    request.abortableTasks,
+    __DEV__ ? task.debugOwner : null,
+    __DEV__ ? task.debugStack : null,
+    __DEV__ ? task.debugTask : null,
+  );
+
+  pingTask(request, newTask);
+  return serializeLazyID(newTask.id);
+}
 
 function outlineTask(request: Request, task: Task): ReactJSONValue {
   const newTask = createTask(
@@ -2382,6 +2416,8 @@ function renderModelDestructive(
   // Set the currently rendering model
   task.model = value;
 
+  serializedSize += parentPropertyName.length;
+
   // Special Symbol, that's very common.
   if (value === REACT_ELEMENT_TYPE) {
     return '$';
@@ -2430,6 +2466,10 @@ function renderModelDestructive(
         }
 
         const element: ReactElement = (value: any);
+
+        if (serializedSize > MAX_ROW_SIZE) {
+          return deferTask(request, task);
+        }
 
         if (__DEV__) {
           const debugInfo: ?ReactDebugInfo = (value: any)._debugInfo;
@@ -2489,6 +2529,10 @@ function renderModelDestructive(
         return newChild;
       }
       case REACT_LAZY_TYPE: {
+        if (serializedSize > MAX_ROW_SIZE) {
+          return deferTask(request, task);
+        }
+
         // Reset the task's thenable state before continuing. If there was one, it was
         // from suspending the lazy before.
         task.thenableState = null;
@@ -2800,6 +2844,7 @@ function renderModelDestructive(
         throwTaintViolation(tainted.message);
       }
     }
+    serializedSize += value.length;
     // TODO: Maybe too clever. If we support URL there's no similar trick.
     if (value[value.length - 1] === 'Z') {
       // Possibly a Date, whose toJSON automatically calls toISOString
@@ -3881,9 +3926,18 @@ function emitChunk(
     return;
   }
   // For anything else we need to try to serialize it using JSON.
-  // $FlowFixMe[incompatible-type] stringify can return null for undefined but we never do
-  const json: string = stringify(value, task.toJSON);
-  emitModelChunk(request, task.id, json);
+  // We stash the outer parent size so we can restore it when we exit.
+  const parentSerializedSize = serializedSize;
+  // We don't reset the serialized size counter from reentry because that indicates that we
+  // are outlining a model and we actually want to include that size into the parent since
+  // it will still block the parent row. It only restores to zero at the top of the stack.
+  try {
+    // $FlowFixMe[incompatible-type] stringify can return null for undefined but we never do
+    const json: string = stringify(value, task.toJSON);
+    emitModelChunk(request, task.id, json);
+  } finally {
+    serializedSize = parentSerializedSize;
+  }
 }
 
 function erroredTask(request: Request, task: Task, error: mixed): void {
@@ -3892,7 +3946,6 @@ function erroredTask(request: Request, task: Task, error: mixed): void {
       emitTimingChunk(request, task.id, performance.now());
     }
   }
-  request.abortableTasks.delete(task);
   task.status = ERRORED;
   if (
     enablePostpone &&
@@ -3907,6 +3960,8 @@ function erroredTask(request: Request, task: Task, error: mixed): void {
     const digest = logRecoverableError(request, error, task);
     emitErrorChunk(request, task.id, digest, error);
   }
+  request.abortableTasks.delete(task);
+  callOnAllReadyIfReady(request);
 }
 
 const emptyRoot = {};
@@ -3986,8 +4041,9 @@ function retryTask(request: Request, task: Task): void {
       emitModelChunk(request, task.id, json);
     }
 
-    request.abortableTasks.delete(task);
     task.status = COMPLETED;
+    request.abortableTasks.delete(task);
+    callOnAllReadyIfReady(request);
   } catch (thrownValue) {
     if (request.status === ABORTING) {
       request.abortableTasks.delete(task);
@@ -4058,7 +4114,6 @@ function performWork(request: Request): void {
   currentRequest = request;
   prepareToUseHooksForRequest(request);
 
-  const hadAbortableTasks = request.abortableTasks.size > 0;
   try {
     const pingedTasks = request.pingedTasks;
     request.pingedTasks = [];
@@ -4068,13 +4123,6 @@ function performWork(request: Request): void {
     }
     if (request.destination !== null) {
       flushCompletedChunks(request, request.destination);
-    }
-    if (hadAbortableTasks && request.abortableTasks.size === 0) {
-      // We can ping after completing but if this happens there already
-      // wouldn't be any abortable tasks. So we only call allReady after
-      // the work which actually completed the last pending task
-      const onAllReady = request.onAllReady;
-      onAllReady();
     }
   } catch (error) {
     logRecoverableError(request, error, null);
@@ -4237,6 +4285,12 @@ function enqueueFlush(request: Request): void {
   }
 }
 
+function callOnAllReadyIfReady(request: Request): void {
+  if (request.abortableTasks.size === 0 && request.abortListeners.size === 0) {
+    request.onAllReady();
+  }
+}
+
 export function startFlowing(request: Request, destination: Destination): void {
   if (request.status === CLOSING) {
     request.status = CLOSED;
@@ -4276,6 +4330,7 @@ export function abort(request: Request, reason: mixed): void {
         // and leave the reference unfulfilled.
         abortableTasks.forEach(task => haltTask(task, request));
         abortableTasks.clear();
+        callOnAllReadyIfReady(request);
       } else if (
         enablePostpone &&
         typeof reason === 'object' &&
@@ -4292,6 +4347,7 @@ export function abort(request: Request, reason: mixed): void {
         emitPostponeChunk(request, errorId, postponeInstance);
         abortableTasks.forEach(task => abortTask(task, request, errorId));
         abortableTasks.clear();
+        callOnAllReadyIfReady(request);
       } else {
         const error =
           reason === undefined
@@ -4314,9 +4370,8 @@ export function abort(request: Request, reason: mixed): void {
         emitErrorChunk(request, errorId, digest, error);
         abortableTasks.forEach(task => abortTask(task, request, errorId));
         abortableTasks.clear();
+        callOnAllReadyIfReady(request);
       }
-      const onAllReady = request.onAllReady;
-      onAllReady();
     }
     const abortListeners = request.abortListeners;
     if (abortListeners.size > 0) {
@@ -4347,6 +4402,7 @@ export function abort(request: Request, reason: mixed): void {
       }
       abortListeners.forEach(callback => callback(error));
       abortListeners.clear();
+      callOnAllReadyIfReady(request);
     }
     if (request.destination !== null) {
       flushCompletedChunks(request, request.destination);
