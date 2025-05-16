@@ -8242,6 +8242,48 @@ const testsTypescript = {
         function MyComponent() {
           const [state, setState] = React.useState<number>(0);
 
+          useSpecialEffect(() => {
+            const someNumber: typeof state = 2;
+            setState(prevState => prevState + someNumber + state);
+          }, [])
+        }
+      `,
+      options: [
+        {
+          additionalHooks: 'useSpecialEffect',
+          experimental_autoDependenciesHooks: ['useSpecialEffect'],
+        },
+      ],
+      errors: [
+        {
+          message:
+            "React Hook useSpecialEffect has a missing dependency: 'state'. " +
+            'Either include it or remove the dependency array. ' +
+            `You can also do a functional update 'setState(s => ...)' ` +
+            `if you only need 'state' in the 'setState' call.`,
+          suggestions: [
+            {
+              desc: 'Update the dependencies array to be: [state]',
+              output: normalizeIndent`
+              function MyComponent() {
+                const [state, setState] = React.useState<number>(0);
+
+                useSpecialEffect(() => {
+                  const someNumber: typeof state = 2;
+                  setState(prevState => prevState + someNumber + state);
+                }, [state])
+              }
+              `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: normalizeIndent`
+        function MyComponent() {
+          const [state, setState] = React.useState<number>(0);
+
           useMemo(() => {
             const someNumber: typeof state = 2;
             console.log(someNumber);
