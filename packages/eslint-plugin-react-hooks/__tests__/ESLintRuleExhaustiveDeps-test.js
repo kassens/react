@@ -1468,8 +1468,57 @@ const tests = {
         }
       `,
     },
+    {
+      code: normalizeIndent`
+        function MyComponent(props) {
+          useSpecialEffect(() => {
+            console.log(props.foo);
+          }, null);
+        }
+      `,
+      options: [
+        {
+          additionalHooks: 'useSpecialEffect',
+          experimental_effectHooksWithNullDependenciesAllowed: [
+            'useSpecialEffect',
+          ],
+        },
+      ],
+    },
   ],
   invalid: [
+    {
+      code: normalizeIndent`
+        function MyComponent(props) {
+          useSpecialEffect(() => {
+            console.log(props.foo);
+          }, null);
+        }
+      `,
+      options: [{additionalHooks: 'useSpecialEffect'}],
+      errors: [
+        {
+          message:
+            "React Hook useSpecialEffect was passed a dependency list that is not an array literal. This means we can't statically verify whether you've passed the correct dependencies.",
+        },
+        {
+          message:
+            "React Hook useSpecialEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.",
+          suggestions: [
+            {
+              desc: 'Update the dependencies array to be: [props.foo]',
+              output: normalizeIndent`
+                function MyComponent(props) {
+                  useSpecialEffect(() => {
+                    console.log(props.foo);
+                  }, [props.foo]);
+                }
+              `,
+            },
+          ],
+        },
+      ],
+    },
     {
       code: normalizeIndent`
         function MyComponent(props) {
