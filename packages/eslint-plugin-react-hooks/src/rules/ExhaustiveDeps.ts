@@ -61,27 +61,41 @@ const rule = {
           enableDangerousAutofixThisMayCauseInfiniteLoops: {
             type: 'boolean',
           },
+          experimental_effectHooksWithNullDependenciesAllowed: {
+            type: 'array',
+            items: {
+              type: 'string',
+            },
+          },
         },
       },
     ],
   },
   create(context: Rule.RuleContext) {
+    const rawOptions = context.options && context.options[0];
+
     // Parse the `additionalHooks` regex.
     const additionalHooks =
-      context.options &&
-      context.options[0] &&
-      context.options[0].additionalHooks
-        ? new RegExp(context.options[0].additionalHooks)
+      rawOptions && rawOptions.additionalHooks
+        ? new RegExp(rawOptions.additionalHooks)
         : undefined;
 
     const enableDangerousAutofixThisMayCauseInfiniteLoops: boolean =
-      (context.options &&
-        context.options[0] &&
-        context.options[0].enableDangerousAutofixThisMayCauseInfiniteLoops) ||
+      (rawOptions &&
+        rawOptions.enableDangerousAutofixThisMayCauseInfiniteLoops) ||
       false;
+
+    const experimental_effectHooksWithNullDependenciesAllowed: ReadonlyArray<string> =
+      rawOptions &&
+      Array.isArray(
+        rawOptions.experimental_effectHooksWithNullDependenciesAllowed,
+      )
+        ? rawOptions.experimental_effectHooksWithNullDependenciesAllowed
+        : [];
 
     const options = {
       additionalHooks,
+      experimental_effectHooksWithNullDependenciesAllowed,
       enableDangerousAutofixThisMayCauseInfiniteLoops,
     };
 
@@ -1315,6 +1329,18 @@ const rule = {
             `React Hook ${reactiveHookName} requires an effect callback. ` +
             `Did you forget to pass a callback to the hook?`,
         });
+        return;
+      }
+
+      // special case effects which allows null as the equivalent of useEffect with no array.
+      if (
+        !declaredDependenciesNode ||
+        (options.experimental_effectHooksWithNullDependenciesAllowed.includes(
+          reactiveHookName,
+        ) &&
+          declaredDependenciesNode.type === 'Literal' &&
+          declaredDependenciesNode.value === null)
+      ) {
         return;
       }
 
