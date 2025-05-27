@@ -27,9 +27,10 @@ let writable;
 let container;
 let buffer = '';
 let hasErrored = false;
+let hasCompleted = false;
 let fatalError = undefined;
 
-describe('ReactDOMFizSuspenseList', () => {
+describe('ReactDOMFizzSuspenseList', () => {
   beforeEach(() => {
     jest.resetModules();
     JSDOM = require('jsdom').JSDOM;
@@ -59,6 +60,7 @@ describe('ReactDOMFizSuspenseList', () => {
 
     buffer = '';
     hasErrored = false;
+    hasCompleted = false;
 
     writable = new Stream.PassThrough();
     writable.setEncoding('utf8');
@@ -68,6 +70,9 @@ describe('ReactDOMFizSuspenseList', () => {
     writable.on('error', error => {
       hasErrored = true;
       fatalError = error;
+    });
+    writable.on('finish', () => {
+      hasCompleted = true;
     });
   });
 
@@ -103,7 +108,12 @@ describe('ReactDOMFizSuspenseList', () => {
 
   function createAsyncText(text) {
     let resolved = false;
+    let error = undefined;
     const Component = function () {
+      if (error !== undefined) {
+        Scheduler.log('Error! [' + error.message + ']');
+        throw error;
+      }
       if (!resolved) {
         Scheduler.log('Suspend! [' + text + ']');
         throw promise;
@@ -113,6 +123,10 @@ describe('ReactDOMFizSuspenseList', () => {
     const promise = new Promise(resolve => {
       Component.resolve = function () {
         resolved = true;
+        return resolve();
+      };
+      Component.reject = function (e) {
+        error = e;
         return resolve();
       };
     });
@@ -173,6 +187,323 @@ describe('ReactDOMFizSuspenseList', () => {
 
     await serverAct(() => B.resolve());
     assertLog(['B']);
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <span>A</span>
+        <span>B</span>
+        <span>C</span>
+      </div>,
+    );
+  });
+
+  // @gate enableSuspenseList
+  it('displays all "together"', async () => {
+    const A = createAsyncText('A');
+    const B = createAsyncText('B');
+    const C = createAsyncText('C');
+
+    function Foo() {
+      return (
+        <div>
+          <SuspenseList revealOrder="together">
+            <Suspense fallback={<Text text="Loading A" />}>
+              <A />
+            </Suspense>
+            <Suspense fallback={<Text text="Loading B" />}>
+              <B />
+            </Suspense>
+            <Suspense fallback={<Text text="Loading C" />}>
+              <C />
+            </Suspense>
+          </SuspenseList>
+        </div>
+      );
+    }
+
+    await A.resolve();
+
+    await serverAct(async () => {
+      const {pipe} = ReactDOMFizzServer.renderToPipeableStream(<Foo />);
+      pipe(writable);
+    });
+
+    assertLog([
+      'A',
+      'Suspend! [B]',
+      'Suspend! [C]',
+      'Loading A',
+      'Loading B',
+      'Loading C',
+    ]);
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <span>Loading A</span>
+        <span>Loading B</span>
+        <span>Loading C</span>
+      </div>,
+    );
+
+    await serverAct(() => B.resolve());
+    assertLog(['B']);
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <span>Loading A</span>
+        <span>Loading B</span>
+        <span>Loading C</span>
+      </div>,
+    );
+
+    await serverAct(() => C.resolve());
+    assertLog(['C']);
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <span>A</span>
+        <span>B</span>
+        <span>C</span>
+      </div>,
+    );
+  });
+
+  // @gate enableSuspenseList
+  it('displays all "together" in a single pass', async () => {
+    function Foo() {
+      return (
+        <div>
+          <SuspenseList revealOrder="together">
+            <Suspense fallback={<Text text="Loading A" />}>
+              <Text text="A" />
+            </Suspense>
+            <Suspense fallback={<Text text="Loading B" />}>
+              <Text text="B" />
+            </Suspense>
+            <Suspense fallback={<Text text="Loading C" />}>
+              <Text text="C" />
+            </Suspense>
+          </SuspenseList>
+        </div>
+      );
+    }
+
+    const {pipe} = ReactDOMFizzServer.renderToPipeableStream(<Foo />);
+    pipe(writable);
+    await 0;
+    const bufferedContent = buffer;
+    buffer = '';
+
+    assertLog(['A', 'B', 'C', 'Loading A', 'Loading B', 'Loading C']);
+
+    expect(bufferedContent).toMatchInlineSnapshot(
+      `"<div><!--$--><span>A</span><!--/$--><!--$--><span>B</span><!--/$--><!--$--><span>C</span><!--/$--></div>"`,
+    );
+  });
+
+  // @gate enableSuspenseList
+  it('displays all "together" even when nested as siblings', async () => {
+    const A = createAsyncText('A');
+    const B = createAsyncText('B');
+    const C = createAsyncText('C');
+
+    function Foo() {
+      return (
+        <div>
+          <SuspenseList revealOrder="together">
+            <div>
+              <Suspense fallback={<Text text="Loading A" />}>
+                <A />
+              </Suspense>
+              <Suspense fallback={<Text text="Loading B" />}>
+                <B />
+              </Suspense>
+            </div>
+            <div>
+              <Suspense fallback={<Text text="Loading C" />}>
+                <C />
+              </Suspense>
+            </div>
+          </SuspenseList>
+        </div>
+      );
+    }
+
+    await A.resolve();
+
+    await serverAct(async () => {
+      const {pipe} = ReactDOMFizzServer.renderToPipeableStream(<Foo />);
+      pipe(writable);
+    });
+
+    assertLog([
+      'A',
+      'Suspend! [B]',
+      'Suspend! [C]',
+      'Loading A',
+      'Loading B',
+      'Loading C',
+    ]);
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <div>
+          <span>Loading A</span>
+          <span>Loading B</span>
+        </div>
+        <div>
+          <span>Loading C</span>
+        </div>
+      </div>,
+    );
+
+    await serverAct(() => B.resolve());
+    assertLog(['B']);
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <div>
+          <span>Loading A</span>
+          <span>Loading B</span>
+        </div>
+        <div>
+          <span>Loading C</span>
+        </div>
+      </div>,
+    );
+
+    await serverAct(() => C.resolve());
+    assertLog(['C']);
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <div>
+          <span>A</span>
+          <span>B</span>
+        </div>
+        <div>
+          <span>C</span>
+        </div>
+      </div>,
+    );
+  });
+
+  // @gate enableSuspenseList
+  it('displays all "together" in nested SuspenseLists', async () => {
+    const A = createAsyncText('A');
+    const B = createAsyncText('B');
+    const C = createAsyncText('C');
+
+    function Foo() {
+      return (
+        <div>
+          <SuspenseList revealOrder="together">
+            <Suspense fallback={<Text text="Loading A" />}>
+              <A />
+            </Suspense>
+            <SuspenseList revealOrder="together">
+              <Suspense fallback={<Text text="Loading B" />}>
+                <B />
+              </Suspense>
+              <Suspense fallback={<Text text="Loading C" />}>
+                <C />
+              </Suspense>
+            </SuspenseList>
+          </SuspenseList>
+        </div>
+      );
+    }
+
+    await A.resolve();
+    await B.resolve();
+
+    await serverAct(async () => {
+      const {pipe} = ReactDOMFizzServer.renderToPipeableStream(<Foo />);
+      pipe(writable);
+    });
+
+    assertLog([
+      'A',
+      'B',
+      'Suspend! [C]',
+      'Loading A',
+      'Loading B',
+      'Loading C',
+    ]);
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <span>Loading A</span>
+        <span>Loading B</span>
+        <span>Loading C</span>
+      </div>,
+    );
+
+    await serverAct(() => C.resolve());
+    assertLog(['C']);
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <span>A</span>
+        <span>B</span>
+        <span>C</span>
+      </div>,
+    );
+  });
+
+  // @gate enableSuspenseList
+  it('displays all "together" in nested SuspenseLists where the inner is default', async () => {
+    const A = createAsyncText('A');
+    const B = createAsyncText('B');
+    const C = createAsyncText('C');
+
+    function Foo() {
+      return (
+        <div>
+          <SuspenseList revealOrder="together">
+            <Suspense fallback={<Text text="Loading A" />}>
+              <A />
+            </Suspense>
+            <SuspenseList>
+              <Suspense fallback={<Text text="Loading B" />}>
+                <B />
+              </Suspense>
+              <Suspense fallback={<Text text="Loading C" />}>
+                <C />
+              </Suspense>
+            </SuspenseList>
+          </SuspenseList>
+        </div>
+      );
+    }
+
+    await A.resolve();
+    await B.resolve();
+
+    await serverAct(async () => {
+      const {pipe} = ReactDOMFizzServer.renderToPipeableStream(<Foo />);
+      pipe(writable);
+    });
+
+    assertLog([
+      'A',
+      'B',
+      'Suspend! [C]',
+      'Loading A',
+      'Loading B',
+      'Loading C',
+    ]);
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <span>Loading A</span>
+        <span>Loading B</span>
+        <span>Loading C</span>
+      </div>,
+    );
+
+    await serverAct(() => C.resolve());
+    assertLog(['C']);
 
     expect(getVisibleChildren(container)).toEqual(
       <div>
@@ -396,5 +727,121 @@ describe('ReactDOMFizSuspenseList', () => {
         <span>C</span>
       </div>,
     );
+  });
+
+  // @gate enableSuspenseList
+  it('can abort a pending SuspenseList', async () => {
+    const A = createAsyncText('A');
+
+    function Foo() {
+      return (
+        <div>
+          <SuspenseList revealOrder="forwards">
+            <Suspense fallback={<Text text="Loading A" />}>
+              <A />
+            </Suspense>
+            <Suspense fallback={<Text text="Loading B" />}>
+              <Text text="B" />
+            </Suspense>
+          </SuspenseList>
+        </div>
+      );
+    }
+
+    const errors = [];
+    let abortStream;
+    await serverAct(async () => {
+      const {pipe, abort} = ReactDOMFizzServer.renderToPipeableStream(<Foo />, {
+        onError(error) {
+          errors.push(error.message);
+        },
+      });
+      pipe(writable);
+      abortStream = abort;
+    });
+
+    assertLog([
+      'Suspend! [A]',
+      'B', // TODO: Defer rendering the content after fallback if previous suspended,
+      'Loading A',
+      'Loading B',
+    ]);
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <span>Loading A</span>
+        <span>Loading B</span>
+      </div>,
+    );
+
+    await serverAct(() => {
+      abortStream();
+    });
+
+    expect(hasCompleted).toBe(true);
+    expect(errors).toEqual([
+      'The render was aborted by the server without a reason.',
+    ]);
+  });
+
+  // @gate enableSuspenseList
+  it('can error a pending SuspenseList', async () => {
+    const A = createAsyncText('A');
+
+    function Foo() {
+      return (
+        <div>
+          <SuspenseList revealOrder="forwards">
+            <Suspense fallback={<Text text="Loading A" />}>
+              <A />
+            </Suspense>
+            <Suspense fallback={<Text text="Loading B" />}>
+              <Text text="B" />
+            </Suspense>
+          </SuspenseList>
+        </div>
+      );
+    }
+
+    const errors = [];
+    await serverAct(async () => {
+      const {pipe} = ReactDOMFizzServer.renderToPipeableStream(<Foo />, {
+        onError(error) {
+          errors.push(error.message);
+        },
+      });
+      pipe(writable);
+    });
+
+    assertLog([
+      'Suspend! [A]',
+      'B', // TODO: Defer rendering the content after fallback if previous suspended,
+      'Loading A',
+      'Loading B',
+    ]);
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <span>Loading A</span>
+        <span>Loading B</span>
+      </div>,
+    );
+
+    await serverAct(async () => {
+      A.reject(new Error('hi'));
+    });
+
+    assertLog(['Error! [hi]']);
+
+    expect(getVisibleChildren(container)).toEqual(
+      <div>
+        <span>Loading A</span>
+        <span>B</span>
+      </div>,
+    );
+
+    expect(errors).toEqual(['hi']);
+    expect(hasErrored).toBe(false);
+    expect(hasCompleted).toBe(true);
   });
 });
