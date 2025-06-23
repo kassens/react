@@ -79,7 +79,9 @@ import {
   logDedupedComponentRender,
   logComponentErrored,
   logIOInfo,
+  logIOInfoErrored,
   logComponentAwait,
+  logComponentAwaitErrored,
 } from './ReactFlightPerformanceTrack';
 
 import {
@@ -95,6 +97,8 @@ import getComponentNameFromType from 'shared/getComponentNameFromType';
 import {getOwnerStackByComponentInfoInDev} from 'shared/ReactComponentInfoStack';
 
 import {injectInternals} from './ReactFlightClientDevToolsHook';
+
+import {OMITTED_PROP_ERROR} from './ReactFlightPropertyAccess';
 
 import ReactVersion from 'shared/ReactVersion';
 
@@ -155,6 +159,7 @@ const RESOLVED_MODEL = 'resolved_model';
 const RESOLVED_MODULE = 'resolved_module';
 const INITIALIZED = 'fulfilled';
 const ERRORED = 'rejected';
+const HALTED = 'halted'; // DEV-only. Means it never resolves even if connection closes.
 
 type PendingChunk<T> = {
   status: 'pending',
@@ -221,13 +226,23 @@ type ErroredChunk<T> = {
   _debugInfo?: null | ReactDebugInfo, // DEV-only
   then(resolve: (T) => mixed, reject?: (mixed) => mixed): void,
 };
+type HaltedChunk<T> = {
+  status: 'halted',
+  value: null,
+  reason: null,
+  _response: Response,
+  _children: Array<SomeChunk<any>> | ProfilingResult, // Profiling-only
+  _debugInfo?: null | ReactDebugInfo, // DEV-only
+  then(resolve: (T) => mixed, reject?: (mixed) => mixed): void,
+};
 type SomeChunk<T> =
   | PendingChunk<T>
   | BlockedChunk<T>
   | ResolvedModelChunk<T>
   | ResolvedModuleChunk<T>
   | InitializedChunk<T>
-  | ErroredChunk<T>;
+  | ErroredChunk<T>
+  | HaltedChunk<T>;
 
 // $FlowFixMe[missing-this-annot]
 function ReactPromise(
@@ -266,7 +281,11 @@ ReactPromise.prototype.then = function <T>(
       initializeModuleChunk(chunk);
       break;
   }
-  if (__DEV__ && enableAsyncDebugInfo) {
+  if (
+    __DEV__ &&
+    enableAsyncDebugInfo &&
+    (typeof resolve !== 'function' || !(resolve: any).isReactInternalListener)
+  ) {
     // Because only native Promises get picked up when we're awaiting we need to wrap
     // this in a native Promise in DEV. This means that these callbacks are no longer sync
     // but the lazy initialization is still sync and the .value can be inspected after,
@@ -307,6 +326,9 @@ ReactPromise.prototype.then = function <T>(
         chunk.reason.push(reject);
       }
       break;
+    case HALTED: {
+      break;
+    }
     default:
       if (reject) {
         reject(chunk.reason);
@@ -364,6 +386,7 @@ function readChunk<T>(chunk: SomeChunk<T>): T {
       return chunk.value;
     case PENDING:
     case BLOCKED:
+    case HALTED:
       // eslint-disable-next-line no-throw-literal
       throw ((chunk: any): Thenable<T>);
     default:
@@ -1052,6 +1075,10 @@ function waitForReference<T>(
       }
     }
   }
+  // Use to avoid the microtask resolution in DEV.
+  if (__DEV__ && enableAsyncDebugInfo) {
+    (fulfill: any).isReactInternalListener = true;
+  }
 
   function reject(error: mixed): void {
     if (handler.errored) {
@@ -1359,6 +1386,7 @@ function getOutlinedModel<T>(
       return chunkValue;
     case PENDING:
     case BLOCKED:
+    case HALTED:
       return waitForReference(chunk, parentObject, key, response, map, path);
     default:
       // This is an error. Instead of erroring directly, we're going to encode this on
@@ -1404,6 +1432,17 @@ function createFormData(
     formData.append(model[i][0], model[i][1]);
   }
   return formData;
+}
+
+function applyConstructor(
+  response: Response,
+  model: Function,
+  parentObject: Object,
+  key: string,
+): void {
+  Object.setPrototypeOf(parentObject, model.prototype);
+  // Delete the property. It was just a placeholder.
+  return undefined;
 }
 
 function extractIterator(response: Response, model: Array<any>): Iterator<any> {
@@ -1462,10 +1501,6 @@ function parseModelString(
       }
       case '@': {
         // Promise
-        if (value.length === 2) {
-          // Infinite promise that never resolves.
-          return new Promise(() => {});
-        }
         const id = parseInt(value.slice(2), 16);
         const chunk = getChunk(response, id);
         if (enableProfilerTimer && enableComponentPerformanceTrack) {
@@ -1586,16 +1621,60 @@ function parseModelString(
         // BigInt
         return BigInt(value.slice(2));
       }
+      case 'P': {
+        if (__DEV__) {
+          // In DEV mode we allow debug objects to specify themselves as instances of
+          // another constructor.
+          const ref = value.slice(2);
+          return getOutlinedModel(
+            response,
+            ref,
+            parentObject,
+            key,
+            applyConstructor,
+          );
+        }
+        //Fallthrough
+      }
       case 'E': {
         if (__DEV__) {
           // In DEV mode we allow indirect eval to produce functions for logging.
           // This should not compile to eval() because then it has local scope access.
+          const code = value.slice(2);
           try {
             // eslint-disable-next-line no-eval
-            return (0, eval)(value.slice(2));
+            return (0, eval)(code);
           } catch (x) {
             // We currently use this to express functions so we fail parsing it,
             // let's just return a blank function as a place holder.
+            if (code.startsWith('(async function')) {
+              const idx = code.indexOf('(', 15);
+              if (idx !== -1) {
+                const name = code.slice(15, idx).trim();
+                // eslint-disable-next-line no-eval
+                return (0, eval)(
+                  '({' + JSON.stringify(name) + ':async function(){}})',
+                )[name];
+              }
+            } else if (code.startsWith('(function')) {
+              const idx = code.indexOf('(', 9);
+              if (idx !== -1) {
+                const name = code.slice(9, idx).trim();
+                // eslint-disable-next-line no-eval
+                return (0, eval)(
+                  '({' + JSON.stringify(name) + ':function(){}})',
+                )[name];
+              }
+            } else if (code.startsWith('(class')) {
+              const idx = code.indexOf('{', 6);
+              if (idx !== -1) {
+                const name = code.slice(6, idx).trim();
+                // eslint-disable-next-line no-eval
+                return (0, eval)('({' + JSON.stringify(name) + ':class{}})')[
+                  name
+                ];
+              }
+            }
             return function () {};
           }
         }
@@ -1609,11 +1688,7 @@ function parseModelString(
           Object.defineProperty(parentObject, key, {
             get: function () {
               // TODO: We should ideally throw here to indicate a difference.
-              return (
-                'This object has been omitted by React in the console log ' +
-                'to avoid sending too much data from the server. Try logging smaller ' +
-                'or more specific objects.'
-              );
+              return OMITTED_PROP_ERROR;
             },
             enumerable: true,
             configurable: false,
@@ -1759,6 +1834,22 @@ export function createResponse(
     replayConsole,
     environmentName,
   );
+}
+
+function resolveDebugHalt(response: Response, id: number): void {
+  const chunks = response._chunks;
+  let chunk = chunks.get(id);
+  if (!chunk) {
+    chunks.set(id, (chunk = createPendingChunk(response)));
+  } else {
+  }
+  if (chunk.status !== PENDING && chunk.status !== BLOCKED) {
+    return;
+  }
+  const haltedChunk: HaltedChunk<any> = (chunk: any);
+  haltedChunk.status = HALTED;
+  haltedChunk.value = null;
+  haltedChunk.reason = null;
 }
 
 function resolveModel(
@@ -2069,32 +2160,34 @@ function startAsyncIterable<T>(
       }
     },
   };
-  const iterable: $AsyncIterable<T, T, void> = {
-    [ASYNC_ITERATOR](): $AsyncIterator<T, T, void> {
-      let nextReadIndex = 0;
-      return createIterator(arg => {
-        if (arg !== undefined) {
-          throw new Error(
-            'Values cannot be passed to next() of AsyncIterables passed to Client Components.',
+
+  const iterable: $AsyncIterable<T, T, void> = ({}: any);
+  // $FlowFixMe[cannot-write]
+  iterable[ASYNC_ITERATOR] = (): $AsyncIterator<T, T, void> => {
+    let nextReadIndex = 0;
+    return createIterator(arg => {
+      if (arg !== undefined) {
+        throw new Error(
+          'Values cannot be passed to next() of AsyncIterables passed to Client Components.',
+        );
+      }
+      if (nextReadIndex === buffer.length) {
+        if (closed) {
+          // $FlowFixMe[invalid-constructor] Flow doesn't support functions as constructors
+          return new ReactPromise(
+            INITIALIZED,
+            {done: true, value: undefined},
+            null,
+            response,
           );
         }
-        if (nextReadIndex === buffer.length) {
-          if (closed) {
-            // $FlowFixMe[invalid-constructor] Flow doesn't support functions as constructors
-            return new ReactPromise(
-              INITIALIZED,
-              {done: true, value: undefined},
-              null,
-              response,
-            );
-          }
-          buffer[nextReadIndex] =
-            createPendingChunk<IteratorResult<T, T>>(response);
-        }
-        return buffer[nextReadIndex++];
-      });
-    },
+        buffer[nextReadIndex] =
+          createPendingChunk<IteratorResult<T, T>>(response);
+      }
+      return buffer[nextReadIndex++];
+    });
   };
+
   // TODO: If it's a single shot iterator we can optimize memory by cleaning up the buffer after
   // reading through the end, but currently we favor code size over this optimization.
   resolveStream(
@@ -2816,7 +2909,29 @@ function initializeIOInfo(response: Response, ioInfo: ReactIOInfo): void {
   // $FlowFixMe[cannot-write]
   ioInfo.end += response._timeOrigin;
 
-  logIOInfo(ioInfo, response._rootEnvironmentName);
+  const env = response._rootEnvironmentName;
+  const promise = ioInfo.value;
+  if (promise) {
+    const thenable: Thenable<mixed> = (promise: any);
+    switch (thenable.status) {
+      case INITIALIZED:
+        logIOInfo(ioInfo, env, thenable.value);
+        break;
+      case ERRORED:
+        logIOInfoErrored(ioInfo, env, thenable.reason);
+        break;
+      default:
+        // If we haven't resolved the Promise yet, wait to log until have so we can include
+        // its data in the log.
+        promise.then(
+          logIOInfo.bind(null, ioInfo, env),
+          logIOInfoErrored.bind(null, ioInfo, env),
+        );
+        break;
+    }
+  } else {
+    logIOInfo(ioInfo, env, undefined);
+  }
 }
 
 function resolveIOInfo(
@@ -3100,13 +3215,55 @@ function flushComponentPerformance(
             }
             // $FlowFixMe: Refined.
             const asyncInfo: ReactAsyncInfo = candidateInfo;
-            logComponentAwait(
-              asyncInfo,
-              trackIdx,
-              time,
-              endTime,
-              response._rootEnvironmentName,
-            );
+            const env = response._rootEnvironmentName;
+            const promise = asyncInfo.awaited.value;
+            if (promise) {
+              const thenable: Thenable<mixed> = (promise: any);
+              switch (thenable.status) {
+                case INITIALIZED:
+                  logComponentAwait(
+                    asyncInfo,
+                    trackIdx,
+                    time,
+                    endTime,
+                    env,
+                    thenable.value,
+                  );
+                  break;
+                case ERRORED:
+                  logComponentAwaitErrored(
+                    asyncInfo,
+                    trackIdx,
+                    time,
+                    endTime,
+                    env,
+                    thenable.reason,
+                  );
+                  break;
+                default:
+                  // We assume that we should have received the data by now since this is logged at the
+                  // end of the response stream. This is more sensitive to ordering so we don't wait
+                  // to log it.
+                  logComponentAwait(
+                    asyncInfo,
+                    trackIdx,
+                    time,
+                    endTime,
+                    env,
+                    undefined,
+                  );
+                  break;
+              }
+            } else {
+              logComponentAwait(
+                asyncInfo,
+                trackIdx,
+                time,
+                endTime,
+                env,
+                undefined,
+              );
+            }
           }
         }
       }
@@ -3329,6 +3486,10 @@ function processFullStringRow(
     }
     // Fallthrough
     default: /* """ "{" "[" "t" "f" "n" "0" - "9" */ {
+      if (__DEV__ && row === '') {
+        resolveDebugHalt(response, id);
+        return;
+      }
       // We assume anything else is JSON.
       resolveModel(response, id, row);
       return;
