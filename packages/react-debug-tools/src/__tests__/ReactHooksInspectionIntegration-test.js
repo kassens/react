@@ -14,7 +14,6 @@ let React;
 let ReactTestRenderer;
 let ReactDebugTools;
 let act;
-let assertConsoleErrorDev;
 let useMemoCache;
 
 function normalizeSourceLoc(tree) {
@@ -34,7 +33,7 @@ describe('ReactHooksInspectionIntegration', () => {
     jest.resetModules();
     React = require('react');
     ReactTestRenderer = require('react-test-renderer');
-    ({act, assertConsoleErrorDev} = require('internal-test-utils'));
+    ({act} = require('internal-test-utils'));
     ReactDebugTools = require('react-debug-tools');
     useMemoCache = require('react/compiler-runtime').c;
   });
