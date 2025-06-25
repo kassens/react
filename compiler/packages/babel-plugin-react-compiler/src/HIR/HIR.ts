@@ -279,7 +279,6 @@ export type HIRFunction = {
   env: Environment;
   params: Array<Place | SpreadPattern>;
   returnTypeAnnotation: t.FlowType | t.TSType | null;
-  returnType: Type;
   returns: Place;
   context: Array<Place>;
   effects: Array<FunctionEffect> | null;
@@ -1768,6 +1767,10 @@ export function isUseRefType(id: Identifier): boolean {
 
 export function isUseStateType(id: Identifier): boolean {
   return id.type.kind === 'Object' && id.type.shapeId === 'BuiltInUseState';
+}
+
+export function isJsxType(type: Type): boolean {
+  return type.kind === 'Object' && type.shapeId === 'BuiltInJsx';
 }
 
 export function isRefOrRefValue(id: Identifier): boolean {

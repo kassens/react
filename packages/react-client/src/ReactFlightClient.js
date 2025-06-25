@@ -77,10 +77,12 @@ import {
   markAllTracksInOrder,
   logComponentRender,
   logDedupedComponentRender,
+  logComponentAborted,
   logComponentErrored,
   logIOInfo,
   logIOInfoErrored,
   logComponentAwait,
+  logComponentAwaitAborted,
   logComponentAwaitErrored,
 } from './ReactFlightPerformanceTrack';
 
@@ -165,7 +167,6 @@ type PendingChunk<T> = {
   status: 'pending',
   value: null | Array<(T) => mixed>,
   reason: null | Array<(mixed) => mixed>,
-  _response: Response,
   _children: Array<SomeChunk<any>> | ProfilingResult, // Profiling-only
   _debugInfo?: null | ReactDebugInfo, // DEV-only
   then(resolve: (T) => mixed, reject?: (mixed) => mixed): void,
@@ -174,7 +175,6 @@ type BlockedChunk<T> = {
   status: 'blocked',
   value: null | Array<(T) => mixed>,
   reason: null | Array<(mixed) => mixed>,
-  _response: Response,
   _children: Array<SomeChunk<any>> | ProfilingResult, // Profiling-only
   _debugInfo?: null | ReactDebugInfo, // DEV-only
   then(resolve: (T) => mixed, reject?: (mixed) => mixed): void,
@@ -182,8 +182,7 @@ type BlockedChunk<T> = {
 type ResolvedModelChunk<T> = {
   status: 'resolved_model',
   value: UninitializedModel,
-  reason: null,
-  _response: Response,
+  reason: Response,
   _children: Array<SomeChunk<any>> | ProfilingResult, // Profiling-only
   _debugInfo?: null | ReactDebugInfo, // DEV-only
   then(resolve: (T) => mixed, reject?: (mixed) => mixed): void,
@@ -192,7 +191,6 @@ type ResolvedModuleChunk<T> = {
   status: 'resolved_module',
   value: ClientReference<T>,
   reason: null,
-  _response: Response,
   _children: Array<SomeChunk<any>> | ProfilingResult, // Profiling-only
   _debugInfo?: null | ReactDebugInfo, // DEV-only
   then(resolve: (T) => mixed, reject?: (mixed) => mixed): void,
@@ -201,7 +199,6 @@ type InitializedChunk<T> = {
   status: 'fulfilled',
   value: T,
   reason: null | FlightStreamController,
-  _response: Response,
   _children: Array<SomeChunk<any>> | ProfilingResult, // Profiling-only
   _debugInfo?: null | ReactDebugInfo, // DEV-only
   then(resolve: (T) => mixed, reject?: (mixed) => mixed): void,
@@ -212,7 +209,6 @@ type InitializedStreamChunk<
   status: 'fulfilled',
   value: T,
   reason: FlightStreamController,
-  _response: Response,
   _children: Array<SomeChunk<any>> | ProfilingResult, // Profiling-only
   _debugInfo?: null | ReactDebugInfo, // DEV-only
   then(resolve: (ReadableStream) => mixed, reject?: (mixed) => mixed): void,
@@ -221,7 +217,6 @@ type ErroredChunk<T> = {
   status: 'rejected',
   value: null,
   reason: mixed,
-  _response: Response,
   _children: Array<SomeChunk<any>> | ProfilingResult, // Profiling-only
   _debugInfo?: null | ReactDebugInfo, // DEV-only
   then(resolve: (T) => mixed, reject?: (mixed) => mixed): void,
@@ -230,7 +225,6 @@ type HaltedChunk<T> = {
   status: 'halted',
   value: null,
   reason: null,
-  _response: Response,
   _children: Array<SomeChunk<any>> | ProfilingResult, // Profiling-only
   _debugInfo?: null | ReactDebugInfo, // DEV-only
   then(resolve: (T) => mixed, reject?: (mixed) => mixed): void,
@@ -245,16 +239,10 @@ type SomeChunk<T> =
   | HaltedChunk<T>;
 
 // $FlowFixMe[missing-this-annot]
-function ReactPromise(
-  status: any,
-  value: any,
-  reason: any,
-  response: Response,
-) {
+function ReactPromise(status: any, value: any, reason: any) {
   this.status = status;
   this.value = value;
   this.reason = reason;
-  this._response = response;
   if (enableProfilerTimer && enableComponentPerformanceTrack) {
     this._children = [];
   }
@@ -342,6 +330,8 @@ export type FindSourceMapURLCallback = (
   environmentName: string,
 ) => null | string;
 
+export type DebugChannelCallback = (message: string) => void;
+
 export type Response = {
   _bundlerConfig: ServerConsumerModuleMap,
   _serverReferenceConfig: null | ServerManifest,
@@ -365,6 +355,7 @@ export type Response = {
   _debugRootStack?: null | Error, // DEV-only
   _debugRootTask?: null | ConsoleTask, // DEV-only
   _debugFindSourceMapURL?: void | FindSourceMapURLCallback, // DEV-only
+  _debugChannel?: void | DebugChannelCallback, // DEV-only
   _replayConsole: boolean, // DEV-only
   _rootEnvironmentName: string, // DEV-only, the requested environment name.
 };
@@ -401,12 +392,12 @@ export function getRoot<T>(response: Response): Thenable<T> {
 
 function createPendingChunk<T>(response: Response): PendingChunk<T> {
   // $FlowFixMe[invalid-constructor] Flow doesn't support functions as constructors
-  return new ReactPromise(PENDING, null, null, response);
+  return new ReactPromise(PENDING, null, null);
 }
 
 function createBlockedChunk<T>(response: Response): BlockedChunk<T> {
   // $FlowFixMe[invalid-constructor] Flow doesn't support functions as constructors
-  return new ReactPromise(BLOCKED, null, null, response);
+  return new ReactPromise(BLOCKED, null, null);
 }
 
 function createErrorChunk<T>(
@@ -414,7 +405,7 @@ function createErrorChunk<T>(
   error: mixed,
 ): ErroredChunk<T> {
   // $FlowFixMe[invalid-constructor] Flow doesn't support functions as constructors
-  return new ReactPromise(ERRORED, null, error, response);
+  return new ReactPromise(ERRORED, null, error);
 }
 
 function wakeChunk<T>(listeners: Array<(T) => mixed>, value: T): void {
@@ -486,7 +477,7 @@ function createResolvedModelChunk<T>(
   value: UninitializedModel,
 ): ResolvedModelChunk<T> {
   // $FlowFixMe[invalid-constructor] Flow doesn't support functions as constructors
-  return new ReactPromise(RESOLVED_MODEL, value, null, response);
+  return new ReactPromise(RESOLVED_MODEL, value, response);
 }
 
 function createResolvedModuleChunk<T>(
@@ -494,7 +485,7 @@ function createResolvedModuleChunk<T>(
   value: ClientReference<T>,
 ): ResolvedModuleChunk<T> {
   // $FlowFixMe[invalid-constructor] Flow doesn't support functions as constructors
-  return new ReactPromise(RESOLVED_MODULE, value, null, response);
+  return new ReactPromise(RESOLVED_MODULE, value, null);
 }
 
 function createInitializedTextChunk(
@@ -502,7 +493,7 @@ function createInitializedTextChunk(
   value: string,
 ): InitializedChunk<string> {
   // $FlowFixMe[invalid-constructor] Flow doesn't support functions as constructors
-  return new ReactPromise(INITIALIZED, value, null, response);
+  return new ReactPromise(INITIALIZED, value, null);
 }
 
 function createInitializedBufferChunk(
@@ -510,7 +501,7 @@ function createInitializedBufferChunk(
   value: $ArrayBufferView | ArrayBuffer,
 ): InitializedChunk<Uint8Array> {
   // $FlowFixMe[invalid-constructor] Flow doesn't support functions as constructors
-  return new ReactPromise(INITIALIZED, value, null, response);
+  return new ReactPromise(INITIALIZED, value, null);
 }
 
 function createInitializedIteratorResultChunk<T>(
@@ -519,12 +510,7 @@ function createInitializedIteratorResultChunk<T>(
   done: boolean,
 ): InitializedChunk<IteratorResult<T, T>> {
   // $FlowFixMe[invalid-constructor] Flow doesn't support functions as constructors
-  return new ReactPromise(
-    INITIALIZED,
-    {done: done, value: value},
-    null,
-    response,
-  );
+  return new ReactPromise(INITIALIZED, {done: done, value: value}, null);
 }
 
 function createInitializedStreamChunk<
@@ -537,7 +523,7 @@ function createInitializedStreamChunk<
   // We use the reason field to stash the controller since we already have that
   // field. It's a bit of a hack but efficient.
   // $FlowFixMe[invalid-constructor] Flow doesn't support functions as constructors
-  return new ReactPromise(INITIALIZED, value, controller, response);
+  return new ReactPromise(INITIALIZED, value, controller);
 }
 
 function createResolvedIteratorResultChunk<T>(
@@ -549,10 +535,11 @@ function createResolvedIteratorResultChunk<T>(
   const iteratorResultJSON =
     (done ? '{"done":true,"value":' : '{"done":false,"value":') + value + '}';
   // $FlowFixMe[invalid-constructor] Flow doesn't support functions as constructors
-  return new ReactPromise(RESOLVED_MODEL, iteratorResultJSON, null, response);
+  return new ReactPromise(RESOLVED_MODEL, iteratorResultJSON, response);
 }
 
 function resolveIteratorResultChunk<T>(
+  response: Response,
   chunk: SomeChunk<IteratorResult<T, T>>,
   value: UninitializedModel,
   done: boolean,
@@ -560,10 +547,11 @@ function resolveIteratorResultChunk<T>(
   // To reuse code as much code as possible we add the wrapper element as part of the JSON.
   const iteratorResultJSON =
     (done ? '{"done":true,"value":' : '{"done":false,"value":') + value + '}';
-  resolveModelChunk(chunk, iteratorResultJSON);
+  resolveModelChunk(response, chunk, iteratorResultJSON);
 }
 
 function resolveModelChunk<T>(
+  response: Response,
   chunk: SomeChunk<T>,
   value: UninitializedModel,
 ): void {
@@ -580,6 +568,7 @@ function resolveModelChunk<T>(
   const resolvedChunk: ResolvedModelChunk<T> = (chunk: any);
   resolvedChunk.status = RESOLVED_MODEL;
   resolvedChunk.value = value;
+  resolvedChunk.reason = response;
   if (resolveListeners !== null) {
     // This is unfortunate that we're reading this eagerly if
     // we already have listeners attached since they might no
@@ -625,6 +614,7 @@ function initializeModelChunk<T>(chunk: ResolvedModelChunk<T>): void {
   initializingHandler = null;
 
   const resolvedModel = chunk.value;
+  const response = chunk.reason;
 
   // We go to the BLOCKED state until we've fully resolved this.
   // We do this before parsing in case we try to initialize the same chunk
@@ -639,7 +629,7 @@ function initializeModelChunk<T>(chunk: ResolvedModelChunk<T>): void {
   }
 
   try {
-    const value: T = parseModel(chunk._response, resolvedModel);
+    const value: T = parseModel(response, resolvedModel);
     // Invoke any listeners added while resolving this model. I.e. cyclic
     // references. This may or may not fully resolve the model depending on
     // if they were blocked.
@@ -702,6 +692,15 @@ export function reportGlobalError(response: Response, error: Error): void {
       triggerErrorOnChunk(chunk, error);
     }
   });
+  if (__DEV__) {
+    const debugChannel = response._debugChannel;
+    if (debugChannel !== undefined) {
+      // If we don't have any more ways of reading data, we don't have to send any
+      // more neither. So we close the writable side.
+      debugChannel('');
+      response._debugChannel = undefined;
+    }
+  }
   if (enableProfilerTimer && enableComponentPerformanceTrack) {
     markAllTracksInOrder();
     flushComponentPerformance(
@@ -1682,6 +1681,14 @@ function parseModelString(
       }
       case 'Y': {
         if (__DEV__) {
+          if (value.length > 2) {
+            const debugChannel = response._debugChannel;
+            if (debugChannel) {
+              const ref = value.slice(2);
+              debugChannel('R:' + ref); // Release this reference immediately
+            }
+          }
+
           // In DEV mode we encode omitted objects in logs as a getter that throws
           // so that when you try to access it on the client, you know why that
           // happened.
@@ -1745,9 +1752,10 @@ function ResponseInstance(
   encodeFormAction: void | EncodeFormActionCallback,
   nonce: void | string,
   temporaryReferences: void | TemporaryReferenceSet,
-  findSourceMapURL: void | FindSourceMapURLCallback,
-  replayConsole: boolean,
-  environmentName: void | string,
+  findSourceMapURL: void | FindSourceMapURLCallback, // DEV-only
+  replayConsole: boolean, // DEV-only
+  environmentName: void | string, // DEV-only
+  debugChannel: void | DebugChannelCallback, // DEV-only
 ) {
   const chunks: Map<number, SomeChunk<any>> = new Map();
   this._bundlerConfig = bundlerConfig;
@@ -1802,9 +1810,16 @@ function ResponseInstance(
       );
     }
     this._debugFindSourceMapURL = findSourceMapURL;
+    this._debugChannel = debugChannel;
     this._replayConsole = replayConsole;
     this._rootEnvironmentName = rootEnv;
   }
+  if (enableProfilerTimer && enableComponentPerformanceTrack) {
+    // Since we don't know when recording of profiles will start and stop, we have to
+    // mark the order over and over again.
+    markAllTracksInOrder();
+  }
+
   // Don't inline this call because it causes closure to outline the call above.
   this._fromJSON = createFromJSONCallback(this);
 }
@@ -1817,9 +1832,10 @@ export function createResponse(
   encodeFormAction: void | EncodeFormActionCallback,
   nonce: void | string,
   temporaryReferences: void | TemporaryReferenceSet,
-  findSourceMapURL: void | FindSourceMapURLCallback,
-  replayConsole: boolean,
-  environmentName: void | string,
+  findSourceMapURL: void | FindSourceMapURLCallback, // DEV-only
+  replayConsole: boolean, // DEV-only
+  environmentName: void | string, // DEV-only
+  debugChannel: void | DebugChannelCallback, // DEV-only
 ): Response {
   // $FlowFixMe[invalid-constructor]: the shapes are exact here but Flow doesn't like constructors
   return new ResponseInstance(
@@ -1833,6 +1849,7 @@ export function createResponse(
     findSourceMapURL,
     replayConsole,
     environmentName,
+    debugChannel,
   );
 }
 
@@ -1862,7 +1879,7 @@ function resolveModel(
   if (!chunk) {
     chunks.set(id, createResolvedModelChunk(response, model));
   } else {
-    resolveModelChunk(chunk, model);
+    resolveModelChunk(response, chunk, model);
   }
 }
 
@@ -2036,7 +2053,7 @@ function startReadableStream<T>(
             // to synchronous emitting.
             previousBlockedChunk = null;
           }
-          resolveModelChunk(chunk, json);
+          resolveModelChunk(response, chunk, json);
         });
       }
     },
@@ -2124,7 +2141,12 @@ function startAsyncIterable<T>(
           false,
         );
       } else {
-        resolveIteratorResultChunk(buffer[nextWriteIndex], value, false);
+        resolveIteratorResultChunk(
+          response,
+          buffer[nextWriteIndex],
+          value,
+          false,
+        );
       }
       nextWriteIndex++;
     },
@@ -2137,12 +2159,18 @@ function startAsyncIterable<T>(
           true,
         );
       } else {
-        resolveIteratorResultChunk(buffer[nextWriteIndex], value, true);
+        resolveIteratorResultChunk(
+          response,
+          buffer[nextWriteIndex],
+          value,
+          true,
+        );
       }
       nextWriteIndex++;
       while (nextWriteIndex < buffer.length) {
         // In generators, any extra reads from the iterator have the value undefined.
         resolveIteratorResultChunk(
+          response,
           buffer[nextWriteIndex++],
           '"$undefined"',
           true,
@@ -2178,7 +2206,6 @@ function startAsyncIterable<T>(
             INITIALIZED,
             {done: true, value: undefined},
             null,
-            response,
           );
         }
         buffer[nextReadIndex] =
@@ -2720,9 +2747,15 @@ function initializeFakeStack(
     // $FlowFixMe[cannot-write]
     debugInfo.debugStack = createFakeJSXCallStackInDEV(response, stack, env);
   }
-  if (debugInfo.owner != null) {
+  const owner = debugInfo.owner;
+  if (owner != null) {
     // Initialize any owners not yet initialized.
-    initializeFakeStack(response, debugInfo.owner);
+    initializeFakeStack(response, owner);
+    if (owner.debugLocation === undefined && debugInfo.debugStack != null) {
+      // If we are the child of this owner, then the owner should be the bottom frame
+      // our stack. We can use it as the implied location of the owner.
+      owner.debugLocation = debugInfo.debugStack;
+    }
   }
 }
 
@@ -2946,7 +2979,7 @@ function resolveIOInfo(
     chunks.set(id, chunk);
     initializeModelChunk(chunk);
   } else {
-    resolveModelChunk(chunk, model);
+    resolveModelChunk(response, chunk, model);
     if (chunk.status === RESOLVED_MODEL) {
       initializeModelChunk(chunk);
     }
@@ -3264,6 +3297,44 @@ function flushComponentPerformance(
                 undefined,
               );
             }
+          }
+        }
+      } else {
+        // Anything between the end and now was aborted if it has no end time.
+        // Either because the client stream was aborted reading it or the server stream aborted.
+        endTime = time; // If we don't find anything else the endTime is the start time.
+        for (let j = debugInfo.length - 1; j > i; j--) {
+          const candidateInfo = debugInfo[j];
+          if (typeof candidateInfo.name === 'string') {
+            if (componentEndTime > childrenEndTime) {
+              childrenEndTime = componentEndTime;
+            }
+            // $FlowFixMe: Refined.
+            const componentInfo: ReactComponentInfo = candidateInfo;
+            const env = response._rootEnvironmentName;
+            logComponentAborted(
+              componentInfo,
+              trackIdx,
+              time,
+              componentEndTime,
+              childrenEndTime,
+              env,
+            );
+            componentEndTime = time; // The end time of previous component is the start time of the next.
+            // Track the root most component of the result for deduping logging.
+            result.component = componentInfo;
+            isLastComponent = false;
+          } else if (candidateInfo.awaited) {
+            // If we don't have an end time for an await, that means we aborted.
+            const asyncInfo: ReactAsyncInfo = candidateInfo;
+            const env = response._rootEnvironmentName;
+            if (asyncInfo.awaited.end > endTime) {
+              endTime = asyncInfo.awaited.end; // Take the end time of the I/O as the await end.
+            }
+            if (endTime > childrenEndTime) {
+              childrenEndTime = endTime;
+            }
+            logComponentAwaitAborted(asyncInfo, trackIdx, time, endTime, env);
           }
         }
       }
