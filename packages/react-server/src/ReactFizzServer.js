@@ -108,7 +108,7 @@ import {
   getMaskedContext,
   processChildContext,
   emptyContextObject,
-} from './ReactFizzContext';
+} from './ReactFizzLegacyContext';
 import {
   readContext,
   rootContextSnapshot,
@@ -4607,10 +4607,12 @@ function abortTask(task: Task, request: Request, error: mixed): void {
     if (node !== null && typeof node === 'object') {
       // Push a fake component stack frame that represents the await.
       pushHaltedAwaitOnComponentStack(task, node._debugInfo);
+      /*
       if (task.thenableState !== null) {
         // TODO: If we were stalled inside use() of a Client Component then we should
         // rerender to get the stack trace from the use() call.
       }
+      */
     }
   }
 
