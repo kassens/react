@@ -928,8 +928,8 @@ function createElement(
   type: mixed,
   key: mixed,
   props: mixed,
-  owner: null | ReactComponentInfo, // DEV-only
-  stack: null | ReactStackTrace, // DEV-only
+  owner: ?ReactComponentInfo, // DEV-only
+  stack: ?ReactStackTrace, // DEV-only
   validated: number, // DEV-only
 ):
   | React$Element<any>
@@ -942,7 +942,7 @@ function createElement(
       type,
       key,
       props,
-      _owner: owner,
+      _owner: owner === undefined ? null : owner,
     }: any);
     Object.defineProperty(element, 'ref', {
       enumerable: false,
@@ -984,7 +984,7 @@ function createElement(
       configurable: false,
       enumerable: false,
       writable: true,
-      value: stack,
+      value: stack === undefined ? null : stack,
     });
     Object.defineProperty(element, '_debugTask', {
       configurable: false,
@@ -2947,7 +2947,7 @@ function buildFakeTask(
 }
 
 const createFakeJSXCallStack = {
-  'react-stack-bottom-frame': function (
+  react_stack_bottom_frame: function (
     response: Response,
     stack: ReactStackTrace,
     environmentName: string,
@@ -2969,7 +2969,7 @@ const createFakeJSXCallStackInDEV: (
   environmentName: string,
 ) => Error = __DEV__
   ? // We use this technique to trick minifiers to preserve the function name.
-    (createFakeJSXCallStack['react-stack-bottom-frame'].bind(
+    (createFakeJSXCallStack.react_stack_bottom_frame.bind(
       createFakeJSXCallStack,
     ): any)
   : (null: any);
@@ -3083,7 +3083,7 @@ function getCurrentStackInDEV(): string {
 }
 
 const replayConsoleWithCallStack = {
-  'react-stack-bottom-frame': function (
+  react_stack_bottom_frame: function (
     response: Response,
     methodName: string,
     stackTrace: ReactStackTrace,
@@ -3135,7 +3135,7 @@ const replayConsoleWithCallStackInDEV: (
   args: Array<mixed>,
 ) => void = __DEV__
   ? // We use this technique to trick minifiers to preserve the function name.
-    (replayConsoleWithCallStack['react-stack-bottom-frame'].bind(
+    (replayConsoleWithCallStack.react_stack_bottom_frame.bind(
       replayConsoleWithCallStack,
     ): any)
   : (null: any);
