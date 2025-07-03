@@ -37,7 +37,7 @@ const stablePackages = {
   'react-server-dom-webpack': ReactVersion,
   'react-server-dom-turbopack': ReactVersion,
   'react-is': ReactVersion,
-  'react-reconciler': '0.31.0',
+  'react-reconciler': '0.310.1',
   'react-refresh': '0.16.0',
   'react-test-renderer': ReactVersion,
   'use-subscription': '1.10.0',
