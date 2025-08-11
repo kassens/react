@@ -18,7 +18,7 @@ import type {
   Dehydrated,
   Unserializable,
 } from 'react-devtools-shared/src/hydration';
-import type {ReactFunctionLocation} from 'shared/ReactTypes';
+import type {ReactFunctionLocation, ReactStackTrace} from 'shared/ReactTypes';
 
 export type BrowserTheme = 'dark' | 'light';
 
@@ -157,6 +157,7 @@ export type Element = {
   type: ElementType,
   displayName: string | null,
   key: number | string | null,
+  nameProp: null | string,
 
   hocDisplayNames: null | Array<string>,
 
@@ -184,10 +185,39 @@ export type Element = {
   compiledWithForget: boolean,
 };
 
+export type SuspenseNode = {
+  id: Element['id'],
+  parentID: SuspenseNode['id'] | 0,
+  children: Array<SuspenseNode['id']>,
+  name: string | null,
+};
+
+// Serialized version of ReactIOInfo
+export type SerializedIOInfo = {
+  name: string,
+  description: string,
+  start: number,
+  end: number,
+  value: null | Promise<mixed>,
+  env: null | string,
+  owner: null | SerializedElement,
+  stack: null | ReactStackTrace,
+};
+
+// Serialized version of ReactAsyncInfo
+export type SerializedAsyncInfo = {
+  awaited: SerializedIOInfo,
+  env: null | string,
+  owner: null | SerializedElement,
+  stack: null | ReactStackTrace,
+};
+
 export type SerializedElement = {
   displayName: string | null,
   id: number,
   key: number | string | null,
+  env: null | string,
+  stack: null | ReactStackTrace,
   hocDisplayNames: Array<string> | null,
   compiledWithForget: boolean,
   type: ElementType,
@@ -227,9 +257,6 @@ export type InspectedElement = {
   // Is this Suspense, and can its value be overridden now?
   canToggleSuspense: boolean,
 
-  // Can view component source location.
-  canViewSource: boolean,
-
   // Does the component have legacy context attached to it.
   hasLegacyContext: boolean,
 
@@ -242,11 +269,20 @@ export type InspectedElement = {
   errors: Array<[string, number]>,
   warnings: Array<[string, number]>,
 
+  // Things that suspended this Instances
+  suspendedBy: Object,
+
   // List of owners
   owners: Array<SerializedElement> | null,
 
+  // Environment name that this component executed in or null for the client
+  env: string | null,
+
   // Location of component in source code.
   source: ReactFunctionLocation | null,
+
+  // The location of the JSX creation.
+  stack: ReactStackTrace | null,
 
   type: ElementType,
 

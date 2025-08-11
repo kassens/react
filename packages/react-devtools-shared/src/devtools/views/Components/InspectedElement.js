@@ -18,13 +18,14 @@ import Toggle from '../Toggle';
 import {ElementTypeSuspense} from 'react-devtools-shared/src/frontend/types';
 import InspectedElementView from './InspectedElementView';
 import {InspectedElementContext} from './InspectedElementContext';
-import {getOpenInEditorURL} from '../../../utils';
-import {LOCAL_STORAGE_OPEN_IN_EDITOR_URL} from '../../../constants';
+import {getAlwaysOpenInEditor} from '../../../utils';
+import {LOCAL_STORAGE_ALWAYS_OPEN_IN_EDITOR} from '../../../constants';
 import FetchFileWithCachingContext from './FetchFileWithCachingContext';
 import {symbolicateSourceWithCache} from 'react-devtools-shared/src/symbolicateSource';
 import OpenInEditorButton from './OpenInEditorButton';
 import InspectedElementViewSourceButton from './InspectedElementViewSourceButton';
 import Skeleton from './Skeleton';
+import useEditorURL from '../useEditorURL';
 
 import styles from './InspectedElement.css';
 
@@ -50,12 +51,19 @@ export default function InspectedElementWrapper(_: Props): React.Node {
 
   const fetchFileWithCaching = useContext(FetchFileWithCachingContext);
 
+  const source =
+    inspectedElement == null
+      ? null
+      : inspectedElement.source != null
+        ? inspectedElement.source
+        : inspectedElement.stack != null && inspectedElement.stack.length > 0
+          ? inspectedElement.stack[0]
+          : null;
+
   const symbolicatedSourcePromise: null | Promise<ReactFunctionLocation | null> =
     React.useMemo(() => {
-      if (inspectedElement == null) return null;
       if (fetchFileWithCaching == null) return Promise.resolve(null);
 
-      const {source} = inspectedElement;
       if (source == null) return Promise.resolve(null);
 
       const [, sourceURL, line, column] = source;
@@ -65,7 +73,7 @@ export default function InspectedElementWrapper(_: Props): React.Node {
         line,
         column,
       );
-    }, [inspectedElement]);
+    }, [source]);
 
   const element =
     inspectedElementID !== null
@@ -118,17 +126,20 @@ export default function InspectedElementWrapper(_: Props): React.Node {
     inspectedElement != null &&
     inspectedElement.canToggleSuspense;
 
-  const editorURL = useSyncExternalStore(
-    function subscribe(callback) {
-      window.addEventListener(LOCAL_STORAGE_OPEN_IN_EDITOR_URL, callback);
+  const alwaysOpenInEditor = useSyncExternalStore(
+    useCallback(function subscribe(callback) {
+      window.addEventListener(LOCAL_STORAGE_ALWAYS_OPEN_IN_EDITOR, callback);
       return function unsubscribe() {
-        window.removeEventListener(LOCAL_STORAGE_OPEN_IN_EDITOR_URL, callback);
+        window.removeEventListener(
+          LOCAL_STORAGE_ALWAYS_OPEN_IN_EDITOR,
+          callback,
+        );
       };
-    },
-    function getState() {
-      return getOpenInEditorURL();
-    },
+    }, []),
+    getAlwaysOpenInEditor,
   );
+
+  const editorURL = useEditorURL();
 
   const toggleErrored = useCallback(() => {
     if (inspectedElement == null) {
@@ -217,14 +228,14 @@ export default function InspectedElementWrapper(_: Props): React.Node {
           </div>
         </div>
 
-        {!!editorURL &&
-          inspectedElement != null &&
-          inspectedElement.source != null &&
+        {!alwaysOpenInEditor &&
+          !!editorURL &&
+          source != null &&
           symbolicatedSourcePromise != null && (
             <React.Suspense fallback={<Skeleton height={16} width={24} />}>
               <OpenInEditorButton
                 editorURL={editorURL}
-                source={inspectedElement.source}
+                source={source}
                 symbolicatedSourcePromise={symbolicatedSourcePromise}
               />
             </React.Suspense>
@@ -271,8 +282,7 @@ export default function InspectedElementWrapper(_: Props): React.Node {
 
         {!hideViewSourceAction && (
           <InspectedElementViewSourceButton
-            canViewSource={inspectedElement?.canViewSource}
-            source={inspectedElement?.source}
+            source={source}
             symbolicatedSourcePromise={symbolicatedSourcePromise}
           />
         )}

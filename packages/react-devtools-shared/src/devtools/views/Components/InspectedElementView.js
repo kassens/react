@@ -8,10 +8,8 @@
  */
 
 import * as React from 'react';
-import {Fragment, useCallback, useContext} from 'react';
-import {TreeDispatcherContext} from './TreeContext';
+import {Fragment, useContext} from 'react';
 import {BridgeContext, StoreContext} from '../context';
-import Button from '../Button';
 import InspectedElementBadges from './InspectedElementBadges';
 import InspectedElementContextTree from './InspectedElementContextTree';
 import InspectedElementErrorsAndWarningsTree from './InspectedElementErrorsAndWarningsTree';
@@ -20,12 +18,12 @@ import InspectedElementPropsTree from './InspectedElementPropsTree';
 import InspectedElementStateTree from './InspectedElementStateTree';
 import InspectedElementStyleXPlugin from './InspectedElementStyleXPlugin';
 import InspectedElementSuspenseToggle from './InspectedElementSuspenseToggle';
+import InspectedElementSuspendedBy from './InspectedElementSuspendedBy';
 import NativeStyleEditor from './NativeStyleEditor';
-import ElementBadges from './ElementBadges';
-import {useHighlightHostInstance} from '../hooks';
 import {enableStyleXFeatures} from 'react-devtools-feature-flags';
-import {logEvent} from 'react-devtools-shared/src/Logger';
 import InspectedElementSourcePanel from './InspectedElementSourcePanel';
+import StackTraceView from './StackTraceView';
+import OwnerView from './OwnerView';
 
 import styles from './InspectedElementView.css';
 
@@ -55,6 +53,7 @@ export default function InspectedElementView({
   symbolicatedSourcePromise,
 }: Props): React.Node {
   const {
+    stack,
     owners,
     rendererPackageName,
     rendererVersion,
@@ -71,8 +70,9 @@ export default function InspectedElementView({
       ? `${rendererPackageName}@${rendererVersion}`
       : null;
   const showOwnersList = owners !== null && owners.length > 0;
+  const showStack = stack != null && stack.length > 0;
   const showRenderedBy =
-    showOwnersList || rendererLabel !== null || rootType !== null;
+    showStack || showOwnersList || rendererLabel !== null || rootType !== null;
 
   return (
     <Fragment>
@@ -156,23 +156,41 @@ export default function InspectedElementView({
           <NativeStyleEditor />
         </div>
 
+        <div className={styles.InspectedElementSection}>
+          <InspectedElementSuspendedBy
+            bridge={bridge}
+            element={element}
+            inspectedElement={inspectedElement}
+            store={store}
+          />
+        </div>
+
         {showRenderedBy && (
           <div
             className={styles.InspectedElementSection}
             data-testname="InspectedElementView-Owners">
             <div className={styles.OwnersHeader}>rendered by</div>
 
+            {showStack ? <StackTraceView stack={stack} /> : null}
             {showOwnersList &&
               owners?.map(owner => (
-                <OwnerView
-                  key={owner.id}
-                  displayName={owner.displayName || 'Anonymous'}
-                  hocDisplayNames={owner.hocDisplayNames}
-                  compiledWithForget={owner.compiledWithForget}
-                  id={owner.id}
-                  isInStore={store.containsElement(owner.id)}
-                  type={owner.type}
-                />
+                <>
+                  <OwnerView
+                    key={owner.id}
+                    displayName={owner.displayName || 'Anonymous'}
+                    hocDisplayNames={owner.hocDisplayNames}
+                    environmentName={
+                      inspectedElement.env === owner.env ? null : owner.env
+                    }
+                    compiledWithForget={owner.compiledWithForget}
+                    id={owner.id}
+                    isInStore={store.containsElement(owner.id)}
+                    type={owner.type}
+                  />
+                  {owner.stack != null && owner.stack.length > 0 ? (
+                    <StackTraceView stack={owner.stack} />
+                  ) : null}
+                </>
               ))}
 
             {rootType !== null && (
@@ -194,59 +212,5 @@ export default function InspectedElementView({
         )}
       </div>
     </Fragment>
-  );
-}
-
-type OwnerViewProps = {
-  displayName: string,
-  hocDisplayNames: Array<string> | null,
-  compiledWithForget: boolean,
-  id: number,
-  isInStore: boolean,
-};
-
-function OwnerView({
-  displayName,
-  hocDisplayNames,
-  compiledWithForget,
-  id,
-  isInStore,
-}: OwnerViewProps) {
-  const dispatch = useContext(TreeDispatcherContext);
-  const {highlightHostInstance, clearHighlightHostInstance} =
-    useHighlightHostInstance();
-
-  const handleClick = useCallback(() => {
-    logEvent({
-      event_name: 'select-element',
-      metadata: {source: 'owner-view'},
-    });
-    dispatch({
-      type: 'SELECT_ELEMENT_BY_ID',
-      payload: id,
-    });
-  }, [dispatch, id]);
-
-  return (
-    <Button
-      key={id}
-      className={styles.OwnerButton}
-      disabled={!isInStore}
-      onClick={handleClick}
-      onMouseEnter={() => highlightHostInstance(id)}
-      onMouseLeave={clearHighlightHostInstance}>
-      <span className={styles.OwnerContent}>
-        <span
-          className={`${styles.Owner} ${isInStore ? '' : styles.NotInStore}`}
-          title={displayName}>
-          {displayName}
-        </span>
-
-        <ElementBadges
-          hocDisplayNames={hocDisplayNames}
-          compiledWithForget={compiledWithForget}
-        />
-      </span>
-    </Button>
   );
 }
