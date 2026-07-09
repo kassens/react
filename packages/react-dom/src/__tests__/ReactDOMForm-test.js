@@ -1647,6 +1647,77 @@ describe('ReactDOMForm', () => {
     expect(inputRef.current.value).toEqual('0');
   });
 
+  it('does not reset controlled fields on submit', async () => {
+    const formRef = React.createRef();
+    const buttonRef = React.createRef();
+    const inputRef = React.createRef();
+    const selectRef = React.createRef();
+    const setUntrackedInputValue = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    ).set;
+    const setUntrackedSelectValue = Object.getOwnPropertyDescriptor(
+      HTMLSelectElement.prototype,
+      'value',
+    ).set;
+
+    function App() {
+      const [inputValue, setInputValue] = useState('bob');
+      const [selectValue, setSelectValue] = useState('bob');
+
+      return (
+        <form ref={formRef} action={() => {}}>
+          <div>Input value: {inputValue}</div>
+          <input
+            ref={inputRef}
+            value={inputValue}
+            name="input-value"
+            onChange={e => setInputValue(e.target.value)}
+          />
+          <div>Select value: {selectValue}</div>
+          <select
+            ref={selectRef}
+            value={selectValue}
+            name="select-value"
+            onChange={e => setSelectValue(e.target.value)}>
+            <option value="alice">Alice</option>
+            <option value="bob">Bob</option>
+            <option value="charlie">Charlie</option>
+          </select>
+          <button ref={buttonRef} type="submit">
+            Save
+          </button>
+        </form>
+      );
+    }
+
+    const root = ReactDOMClient.createRoot(container);
+    await act(() => root.render(<App />));
+
+    // Change both controlled fields and verify state and DOM value match.
+    await act(() => {
+      setUntrackedInputValue.call(inputRef.current, 'charlie');
+      inputRef.current.dispatchEvent(new Event('input', {bubbles: true}));
+      setUntrackedSelectValue.call(selectRef.current, 'charlie');
+      selectRef.current.dispatchEvent(new Event('change', {bubbles: true}));
+    });
+
+    expect(container.textContent).toContain('Input value: charlie');
+    expect(container.textContent).toContain('Select value: charlie');
+    expect(inputRef.current.value).toBe('charlie');
+    expect(selectRef.current.value).toBe('charlie');
+
+    await submit(buttonRef.current);
+
+    // The input remains controlled after submit.
+    expect(container.textContent).toContain('Input value: charlie');
+    expect(inputRef.current.value).toBe('charlie');
+
+    // Repro: this currently fails because select is reset to the initial value.
+    expect(container.textContent).toContain('Select value: charlie');
+    expect(selectRef.current.value).toBe('charlie');
+  });
+
   it('requestFormReset schedules a form reset after transition completes', async () => {
     // This is the same as the previous test, except the form is updated with
     // a userspace action instead of a built-in form action.
